@@ -1,0 +1,27 @@
+[
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "g4dn.xlarge"
+  },
+  {
+    "ParameterKey": "AMIId",
+    "ParameterValue": "ami-XXXXX"
+  },
+  {
+    "ParameterKey": "KeyPairName",
+    "ParameterValue": "your-keypair-name"
+  },
+  {
+    "ParameterKey": "AllowedSSHCIDR",
+    "ParameterValue": "0.0.0.0/0"
+  },
+  {
+    "ParameterKey": "AllowedVNCCIDR",
+    "ParameterValue": "0.0.0.0/0"
+  },
+  {
+    "ParameterKey": "VolumeSize",
+    "ParameterValue": "100"
+  }
+]
+

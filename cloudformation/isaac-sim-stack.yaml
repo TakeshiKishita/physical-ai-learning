@@ -1,0 +1,222 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Isaac Sim EC2 Instance Stack for Physical AI Learning - Latest best practices'
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Instance Configuration
+        Parameters:
+          - InstanceType
+          - AMIId
+          - KeyPairName
+          - VolumeSize
+      - Label:
+          default: Security Settings
+        Parameters:
+          - AllowedSSHCIDR
+          - AllowedVNCCIDR
+    ParameterLabels:
+      InstanceType:
+        default: Instance Type
+      AMIId:
+        default: AMI ID
+      KeyPairName:
+        default: Key Pair Name
+      AllowedSSHCIDR:
+        default: Allowed SSH CIDR
+      AllowedVNCCIDR:
+        default: Allowed VNC CIDR
+      VolumeSize:
+        default: Volume Size (GB)
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: g4dn.xlarge
+    AllowedValues:
+      - g4dn.xlarge
+      - g4dn.2xlarge
+      - g5.xlarge
+    Description: EC2 instance type for Isaac Sim
+  
+  AMIId:
+    Type: String
+    Description: AMI ID for Isaac Sim (region-specific)
+    Default: ami-XXXXX
+  
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair to enable SSH access
+  
+  AllowedSSHCIDR:
+    Type: String
+    Default: 0.0.0.0/0
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+    ConstraintDescription: Must be a valid CIDR block (e.g., 203.0.113.0/24 or 0.0.0.0/0)
+    Description: CIDR block allowed to SSH access (recommend your IP/32 for security)
+  
+  AllowedVNCCIDR:
+    Type: String
+    Default: 0.0.0.0/0
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+    ConstraintDescription: Must be a valid CIDR block (e.g., 203.0.113.0/24 or 0.0.0.0/0)
+    Description: CIDR block allowed to VNC/DCV access (recommend your IP/32 for security)
+  
+  VolumeSize:
+    Type: Number
+    Default: 100
+    MinValue: 20
+    MaxValue: 1000
+    Description: Size of the root EBS volume in GB
+
+Resources:
+  # VPC (デフォルトVPCを使用する場合、このセクションは削除可能)
+  # 既存のVPCを使用する場合は、VPCIdパラメータを追加して使用
+  
+  # セキュリティグループ
+  IsaacSimSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Isaac Sim EC2 instance
+      GroupName: !Sub '${AWS::StackName}-sg'
+      SecurityGroupIngress:
+        # SSH access
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedSSHCIDR
+          Description: SSH access for instance management
+        # VNC access (port range)
+        - IpProtocol: tcp
+          FromPort: 5900
+          ToPort: 5910
+          CidrIp: !Ref AllowedVNCCIDR
+          Description: VNC/DCV access for remote desktop
+      SecurityGroupEgress:
+        # Allow all outbound traffic (default, but explicit for clarity)
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-sg'
+        - Key: Project
+          Value: physical-ai-learning
+        - Key: ManagedBy
+          Value: CloudFormation
+  
+  # IAM Role (Systems Manager Session Manager用)
+  IsaacSimInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-instance-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: CloudWatchAgentServerPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:ListMetrics
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: '*'
+      Tags:
+        - Key: Project
+          Value: physical-ai-learning
+        - Key: ManagedBy
+          Value: CloudFormation
+  
+  IsaacSimInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${AWS::StackName}-instance-profile'
+      Roles:
+        - !Ref IsaacSimInstanceRole
+  
+  # EC2 Instance
+  IsaacSimInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      SecurityGroupIds:
+        - !Ref IsaacSimSecurityGroup
+      IamInstanceProfile: !Ref IsaacSimInstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref VolumeSize
+            VolumeType: gp3
+            Iops: 3000
+            Encrypted: true
+            DeleteOnTermination: true
+      Monitoring: true
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-instance'
+        - Key: Project
+          Value: physical-ai-learning
+        - Key: Week
+          Value: week1
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: CreatedBy
+          Value: !Sub '${AWS::StackName}'
+
+Outputs:
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref IsaacSimInstance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+  
+  PublicIP:
+    Description: Public IP address of the instance
+    Value: !GetAtt IsaacSimInstance.PublicIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicIP'
+  
+  PrivateIP:
+    Description: Private IP address of the instance
+    Value: !GetAtt IsaacSimInstance.PrivateIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PrivateIP'
+  
+  SecurityGroupId:
+    Description: Security Group ID
+    Value: !Ref IsaacSimSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'
+  
+  SSHCommand:
+    Description: SSH command to connect to the instance
+    Value: !Sub 'ssh -i ~/.ssh/${KeyPairName}.pem ubuntu@${IsaacSimInstance.PublicIp}'
+  
+  SSMCommand:
+    Description: AWS Systems Manager Session Manager command (no SSH key needed)
+    Value: !Sub 'aws ssm start-session --target ${IsaacSimInstance}'
+  
+  CloudFormationConsole:
+    Description: Link to view this stack in the AWS CloudFormation console
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudformation/home?region=${AWS::Region}#/stacks/stackinfo?stackId=${AWS::StackId}'
+
