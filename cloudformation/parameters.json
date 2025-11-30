@@ -22,6 +22,18 @@
   {
     "ParameterKey": "VolumeSize",
     "ParameterValue": "100"
+  },
+  {
+    "ParameterKey": "UseSpotInstance",
+    "ParameterValue": "false"
+  },
+  {
+    "ParameterKey": "SpotInstanceMaxPrice",
+    "ParameterValue": "0.10"
+  },
+  {
+    "ParameterKey": "AutoShutdownEnabled",
+    "ParameterValue": "true"
   }
 ]
 

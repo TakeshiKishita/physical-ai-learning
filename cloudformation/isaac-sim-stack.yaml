@@ -38,7 +38,13 @@ Parameters:
       - g4dn.xlarge
       - g4dn.2xlarge
       - g5.xlarge
-    Description: EC2 instance type for Isaac Sim
+      - g6e.xlarge
+      - g6e.2xlarge
+    Description: |
+      EC2 instance type for Isaac Sim.
+      - g4dn.xlarge: Cost-effective, older generation (T4 GPU)
+      - g6e.xlarge: Latest generation with L40S GPU (2x performance, higher cost)
+      - For learning: g4dn.xlarge recommended for cost savings
   
   AMIId:
     Type: String
@@ -69,6 +75,39 @@ Parameters:
     MinValue: 20
     MaxValue: 1000
     Description: Size of the root EBS volume in GB
+  
+  UseSpotInstance:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: |
+      Use Spot Instance for cost savings (up to 90% discount).
+      Warning: Spot instances can be interrupted. Recommended for learning/testing.
+  
+  SpotInstanceMaxPrice:
+    Type: String
+    Default: '0.10'
+    Description: |
+      Maximum price per hour for Spot Instance (USD).
+      Leave empty to use current On-Demand price.
+      Only used when UseSpotInstance is 'true'
+  
+  AutoShutdownEnabled:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: |
+      Enable automatic shutdown after idle time to save costs.
+      Uses CloudWatch alarm to stop instance after 2 hours of low CPU usage.
+
+Conditions:
+  UseSpotInstance: !Equals [!Ref UseSpotInstance, 'true']
+  HasSpotPrice: !Not [!Equals [!Ref SpotInstanceMaxPrice, '']]
+  AutoShutdownEnabled: !Equals [!Ref AutoShutdownEnabled, 'true']
 
 Resources:
   # VPC (デフォルトVPCを使用する場合、このセクションは削除可能)
@@ -158,6 +197,17 @@ Resources:
       SecurityGroupIds:
         - !Ref IsaacSimSecurityGroup
       IamInstanceProfile: !Ref IsaacSimInstanceProfile
+      InstanceMarketOptions: !If
+        - UseSpotInstance
+        - MarketType: spot
+          SpotOptions:
+            MaxPrice: !If
+              - HasSpotPrice
+              - !Ref SpotInstanceMaxPrice
+              - !Ref AWS::NoValue
+            SpotInstanceType: persistent
+            InstanceInterruptionBehavior: stop
+        - !Ref AWS::NoValue
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -182,6 +232,106 @@ Resources:
           Value: CloudFormation
         - Key: CreatedBy
           Value: !Sub '${AWS::StackName}'
+        - Key: AutoShutdown
+          Value: !Ref AutoShutdownEnabled
+        - Key: SpotInstance
+          Value: !Ref UseSpotInstance
+  
+  # Lambda function to stop instance
+  AutoShutdownFunction:
+    Condition: AutoShutdownEnabled
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-auto-shutdown'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt AutoShutdownLambdaRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          INSTANCE_ID: !Ref IsaacSimInstance
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+          import json
+          
+          def handler(event, context):
+              ec2 = boto3.client('ec2')
+              instance_id = os.environ['INSTANCE_ID']
+              
+              try:
+                  # Check if instance is running
+                  response = ec2.describe_instances(InstanceIds=[instance_id])
+                  state = response['Reservations'][0]['Instances'][0]['State']['Name']
+                  
+                  if state == 'running':
+                      ec2.stop_instances(InstanceIds=[instance_id])
+                      print(f'Stopped instance {instance_id} due to low CPU usage')
+                      return {'statusCode': 200, 'body': json.dumps('Instance stopped successfully')}
+                  else:
+                      print(f'Instance {instance_id} is already {state}')
+                      return {'statusCode': 200, 'body': json.dumps(f'Instance is {state}')}
+              except Exception as e:
+                  print(f'Error stopping instance: {str(e)}')
+                  raise
+  
+  # IAM Role for Lambda
+  AutoShutdownLambdaRole:
+    Condition: AutoShutdownEnabled
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: StopInstancePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:StopInstances
+                  - ec2:DescribeInstances
+                Resource: '*'
+  
+  # CloudWatch Alarm for Auto Shutdown (cost optimization)
+  AutoShutdownAlarm:
+    Condition: AutoShutdownEnabled
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: AutoShutdownFunction
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-auto-shutdown'
+      AlarmDescription: Automatically stop instance after 2 hours of low CPU usage
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 24
+      Threshold: 5
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref IsaacSimInstance
+      AlarmActions:
+        - !GetAtt AutoShutdownFunction.Arn
+      TreatMissingData: notBreaching
+  
+  # Lambda Permission for CloudWatch
+  AutoShutdownLambdaPermission:
+    Condition: AutoShutdownEnabled
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AutoShutdownFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !Sub 'arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${AWS::StackName}-auto-shutdown'
 
 Outputs:
   InstanceId:
@@ -219,4 +369,18 @@ Outputs:
   CloudFormationConsole:
     Description: Link to view this stack in the AWS CloudFormation console
     Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudformation/home?region=${AWS::Region}#/stacks/stackinfo?stackId=${AWS::StackId}'
+  
+  InstanceType:
+    Description: Instance type used
+    Value: !Ref InstanceType
+  
+  SpotInstanceStatus:
+    Condition: UseSpotInstance
+    Description: Spot Instance is enabled for cost savings
+    Value: 'Enabled'
+  
+  AutoShutdownStatus:
+    Condition: AutoShutdownEnabled
+    Description: Auto shutdown is enabled to save costs
+    Value: 'Enabled - Instance will stop after 2 hours of low CPU usage'
 
