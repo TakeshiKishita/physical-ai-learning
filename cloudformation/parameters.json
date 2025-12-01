@@ -5,11 +5,11 @@
   },
   {
     "ParameterKey": "AMIId",
-    "ParameterValue": "ami-XXXXX"
+    "ParameterValue": "ami-083436b6b99e9e44e"
   },
   {
     "ParameterKey": "KeyPairName",
-    "ParameterValue": "your-keypair-name"
+    "ParameterValue": "isaac-sim-keypair"
   },
   {
     "ParameterKey": "AllowedSSHCIDR",
@@ -21,15 +21,15 @@
   },
   {
     "ParameterKey": "VolumeSize",
-    "ParameterValue": "100"
+    "ParameterValue": "150"
   },
   {
     "ParameterKey": "UseSpotInstance",
-    "ParameterValue": "false"
+    "ParameterValue": "true"
   },
   {
     "ParameterKey": "SpotInstanceMaxPrice",
-    "ParameterValue": "0.10"
+    "ParameterValue": ""
   },
   {
     "ParameterKey": "AutoShutdownEnabled",

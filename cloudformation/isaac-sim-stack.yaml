@@ -71,10 +71,13 @@ Parameters:
   
   VolumeSize:
     Type: Number
-    Default: 100
-    MinValue: 20
+    Default: 150
+    MinValue: 128
     MaxValue: 1000
-    Description: Size of the root EBS volume in GB
+    Description: |
+      Size of the root EBS volume in GB.
+      Minimum 128GB required for Isaac Sim AMI.
+      Recommended: 150GB for comfortable usage.
   
   UseSpotInstance:
     Type: String
@@ -132,11 +135,7 @@ Resources:
           ToPort: 5910
           CidrIp: !Ref AllowedVNCCIDR
           Description: VNC/DCV access for remote desktop
-      SecurityGroupEgress:
-        # Allow all outbound traffic (default, but explicit for clarity)
-        - IpProtocol: -1
-          CidrIp: 0.0.0.0/0
-          Description: Allow all outbound traffic
+      # SecurityGroupEgress は削除（デフォルトVPCでは自動的に全アウトバウンドトラフィックが許可される）
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-sg'

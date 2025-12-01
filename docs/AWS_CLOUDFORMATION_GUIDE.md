@@ -26,141 +26,31 @@ AWS CloudFormationを使用してIsaac Sim環境を構築する方法です。
 | **AWS Launch Templates** | EC2起動設定のみ | シンプル、EC2専用 |
 | **AWS Systems Manager** | インスタンス管理 | 既存インスタンスの管理 |
 
-## 前提条件: AWS CLIの設定
+## 前提条件: AWS CLIの設定（CloudShell 前提）
 
-このガイドでは、AWS CLIを使用してCloudFormationスタックを管理します。以下の設定が必要です。
+このガイドでは、**AWS CloudShell をメインの実行環境** として想定し、AWS CLIを使用してCloudFormationスタックを管理します。
 
-### AWS CLIのインストール
+CloudShell では、以下があらかじめ用意されています：
 
-AWS CLIがインストールされていない場合は、以下のコマンドでインストールしてください。
+- AWS CLI がインストール済み
+- 一時的な認証情報（アクセスキー）が自動的に付与済み
+- ログイン中のアカウント／権限で `aws` コマンドがすぐに利用可能
 
-**macOS (Homebrew)**
-```bash
-brew install awscli
-```
+そのため **CloudShell を使う場合、IAMユーザーのアクセスキーIDやシークレットアクセスキーを自分で発行して `aws configure` に入力する必要はありません。**
 
-**Linux**
-```bash
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
-```
+### AWS認証情報の設定（CloudShell）
 
-**Windows**
-```powershell
-# Chocolateyを使用する場合
-choco install awscli
-```
-
-**インストール確認**
-```bash
-aws --version
-```
-
-### AWS認証情報の設定
-
-AWS CLIを使用するには、AWS認証情報（アクセスキーIDとシークレットアクセスキー）を設定する必要があります。
-
-#### 方法A: `aws configure` コマンドを使用（推奨）
+- ブラウザで AWS マネジメントコンソールにログインし、右上の「>_ CloudShell」ボタンから CloudShell を起動してください。
+- CloudShell では、**認証情報（アクセスキーID／シークレットアクセスキー）は自動付与** されるため、通常は設定不要です。
+- 次のコマンドで、現在の実行主体（ユーザーまたはロール）を確認できます：
 
 ```bash
-aws configure
-```
-
-以下の情報を入力します：
-
-1. **AWS Access Key ID**: IAMユーザーのアクセスキーID
-2. **AWS Secret Access Key**: IAMユーザーのシークレットアクセスキー
-3. **Default region name**: `ap-northeast-1`（東京リージョン）
-4. **Default output format**: `json`（推奨）または `table`、`text`
-
-このコマンドにより、以下のファイルが作成・更新されます：
-- `~/.aws/credentials`: 認証情報を保存
-- `~/.aws/config`: デフォルトリージョンと出力形式を保存
-
-#### 方法B: 環境変数を使用
-
-```bash
-export AWS_ACCESS_KEY_ID="your-access-key-id"
-export AWS_SECRET_ACCESS_KEY="your-secret-access-key"
-export AWS_DEFAULT_REGION="ap-northeast-1"
-```
-
-#### 方法C: 認証情報ファイルを手動で作成
-
-```bash
-# 認証情報ファイルを作成
-mkdir -p ~/.aws
-cat > ~/.aws/credentials <<EOF
-[default]
-aws_access_key_id = your-access-key-id
-aws_secret_access_key = your-secret-access-key
-EOF
-
-# 設定ファイルを作成
-cat > ~/.aws/config <<EOF
-[default]
-region = ap-northeast-1
-output = json
-EOF
-
-# ファイルのパーミッションを設定（セキュリティのため）
-chmod 600 ~/.aws/credentials
-chmod 600 ~/.aws/config
-```
-
-### IAMユーザーとアクセスキーの作成
-
-AWS認証情報を取得するには、IAMユーザーとアクセスキーを作成する必要があります。
-
-1. [IAMコンソール](https://console.aws.amazon.com/iam/)にアクセス
-2. 左メニューから「ユーザー」を選択
-3. 「ユーザーを追加」をクリック
-4. ユーザー名を入力（例: `cloudformation-user`）
-5. 「プログラムによるアクセス」を選択
-6. 「既存のポリシーを直接アタッチ」を選択し、以下のポリシーをアタッチ：
-   - `CloudFormationFullAccess`
-   - `AmazonEC2FullAccess`
-   - `IAMFullAccess`（IAMロール作成のため）
-7. ユーザーを作成
-8. **アクセスキーID**と**シークレットアクセスキー**を保存（表示されるのは一度だけです）
-
-**注意**: セキュリティのため、最小権限の原則に従い、必要最小限の権限のみを付与することを推奨します。
-
-### 設定の確認
-
-以下のコマンドで設定が正しく行われているか確認できます：
-
-```bash
-# 現在の設定を確認
-aws configure list
-
-# 認証情報の確認（IAMユーザー名が表示される）
 aws sts get-caller-identity
-
-# リージョンの確認
-aws configure get region
 ```
 
-### トラブルシューティング
-
-**エラー: Unable to locate credentials**
-
-認証情報が設定されていない場合に発生します。`aws configure` を実行して認証情報を設定してください。
-
-**エラー: An error occurred (AccessDenied) when calling the ... operation**
-
-IAMユーザーに必要な権限が付与されていない可能性があります。IAMポリシーを確認してください。
-
-**リージョンが正しく設定されていない**
-
-```bash
-# リージョンを確認
-aws configure get region
-
-# リージョンを設定
-aws configure set region ap-northeast-1
-```
+- 別アカウント／別プロファイルで操作したいなどの特殊なケースを除き、**CloudShell では `aws configure` でアクセスキーを入力する必要はありません。**
+  - CloudShell が紐づいているアカウント／ロールの権限により、CloudFormation や EC2 を操作できるかどうかが決まります。
+  - 必要に応じて管理者に、CloudFormation・EC2・IAM などの権限を付与してもらってください。
 
 ## セットアップ手順
 
@@ -175,6 +65,10 @@ EC2インスタンスにSSH接続するために、キーペアが必要です�
 ```bash
 # キーペア名を指定（例: isaac-sim-keypair）
 KEYPAIR_NAME="isaac-sim-keypair"
+
+# ~/.ssh ディレクトリが無い場合は作成（CloudShell初回利用時など）
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
 
 # キーペアを作成
 aws ec2 create-key-pair \
@@ -213,32 +107,20 @@ aws ec2 describe-key-pairs \
 
 Isaac Sim用のAMI IDは、リージョンごとに異なります。以下の方法で取得できます。
 
-**方法A: AWS Marketplaceから取得**
+1. [AWS Marketplace - NVIDIA Omniverse Isaac Sim](https://aws.amazon.com/marketplace/pp/prodview-bl35herdyozhw)にアクセス
+2. 画面右上または右側にある  
+   - 日本語UIの場合: **「購入オプションを表示」** をクリック
+![AWS MarketplaceでのNVIDIA Omniverse Isaac Sim AMI選択画面](../screenshots/week1/aws-marketplace-Isaac-sim-1.png)
+1. 続いて表示される画面で  
+   - 日本語UIの場合: **「サブスクライブ」** をクリック
+![AWS Marketplaceでの「サブスクライブ」クリック画面](../screenshots/week1/aws-marketplace-Isaac-sim-2.png)
+1. 続いて表示される画面で  
+   - 日本語UIの場合: **「新規インスタンスを起動する」** を選択  
+   ※すぐにインスタンス起動されるワケではないです
+![AWS MarketplaceでのAMI ID確認画面](../screenshots/week1/aws-marketplace-Isaac-sim-3.png)
 
-1. [AWS Marketplace - NVIDIA Omniverse Isaac Sim](https://aws.amazon.com/marketplace/pp/prodview-xxxxxxxxxxxxx)にアクセス
-2. 使用するリージョン（例: ap-northeast-1）を選択
-3. 「Continue to Subscribe」→「Continue to Configuration」をクリック
-4. 「Fulfillment option」で「CloudFormation」を選択
-5. 「Usage Instructions」タブでAMI IDを確認
-
-**方法B: AWS CLIで検索**
-
-```bash
-# Isaac Sim関連のAMIを検索（リージョン: ap-northeast-1）
-aws ec2 describe-images \
-  --owners amazon \
-  --filters "Name=name,Values=*Isaac*Sim*" \
-            "Name=state,Values=available" \
-  --query 'Images[*].[ImageId,Name,CreationDate]' \
-  --output table \
-  --sort-by CreationDate
-```
-
-**方法C: 公式ドキュメントを確認**
-
-- [NVIDIA Isaac Sim on AWS](https://docs.nvidia.com/isaac/isaac-sim/setup_python_aws.html)の公式ドキュメントで最新のAMI IDを確認
-
-**注意**: AMI IDはリージョン固有です。`ap-northeast-1`で使用する場合は、そのリージョンのAMI IDを使用してください。
+1. 「AMI の詳細」から AMI ID を確認  
+    - **起動方法**を選択し、東京リージョンのAMI IDを取得 ![AMI ID確認例（AMI詳細を表示した画面）](../screenshots/week1/aws-marketplace-Isaac-sim-4.png)
 
 #### 1-3. 自分のIPアドレスの取得
 
@@ -268,18 +150,6 @@ echo "CIDR format: $MY_IP/32"
 - `g6e.xlarge`: 最新世代（L40S GPU、2倍の性能、高コスト）
 - `g6e.2xlarge`: g6e.xlargeの2倍の性能
 
-**コスト比較（参考）**
-
-```bash
-# インスタンスタイプごとの料金を確認（ap-northeast-1）
-aws pricing get-products \
-  --service-code AmazonEC2 \
-  --filters "Type=TERM_MATCH,Field=instanceType,Value=g4dn.xlarge" \
-            "Type=TERM_MATCH,Field=location,Value=Asia Pacific (Tokyo)" \
-  --query 'PriceList[0]' \
-  --output json | jq -r '.terms.OnDemand | to_entries[0].value.priceDimensions | to_entries[0].value.pricePerUnit.USD'
-```
-
 ### ステップ2: パラメータファイルの編集
 
 `cloudformation/parameters.json` を編集して、実際の値を設定します。
@@ -295,8 +165,25 @@ aws pricing get-products \
 | `AllowedVNCCIDR` | VNC接続許可CIDR | 上記1-3を参照 | `0.0.0.0/0`（全許可） |
 | `VolumeSize` | EBSボリュームサイズ（GB） | 20-1000の範囲で指定 | `100` |
 | `UseSpotInstance` | スポットインスタンス使用 | `true`（コスト削減）または`false` | `false` |
-| `SpotInstanceMaxPrice` | スポットインスタンス最大価格（USD/時） | 現在のオンデマンド価格を確認 | `0.10` |
+| `SpotInstanceMaxPrice` | スポットインスタンス最大価格（USD/時） | 空文字列（`""`）でオンデマンド価格を自動使用 | `""`（空文字列） |
 | `AutoShutdownEnabled` | 自動シャットダウン有効化 | `true`（推奨）または`false` | `true` |
+
+**SpotInstanceMaxPriceの確認方法**
+
+`SpotInstanceMaxPrice`は、スポットインスタンスの最大入札価格（USD/時）です。空文字列（`""`）にすると、オンデマンド価格が自動的に使用されます。明示的に設定したい場合は、以下の方法でオンデマンド価格を確認できます。
+
+1. [EC2コンソール](https://ap-northeast-1.console.aws.amazon.com/ec2/)にアクセス
+2. 左メニューから「スポットリクエスト」→「リクエスト」を選択
+3. 「スポットインスタンスをリクエスト」をクリック
+4. インスタンスタイプ（例: `g4dn.xlarge`）を選択
+5. 「価格履歴」タブで現在のスポット価格を確認
+6. オンデマンド価格も表示されるので、それを参考に設定
+
+**推奨設定値**
+
+- **確実に起動したい場合**: 空文字列（`""`）またはオンデマンド価格を設定
+- **コスト削減を優先する場合**: オンデマンド価格の50-70%程度（例: `0.10` - `0.30`）
+- **注意**: 価格が低すぎると、スポットインスタンスが取得できない場合があります
 
 **編集例**
 
@@ -332,71 +219,125 @@ aws pricing get-products \
   },
   {
     "ParameterKey": "SpotInstanceMaxPrice",
-    "ParameterValue": "0.10"
+    "ParameterValue": ""
   },
   {
     "ParameterKey": "AutoShutdownEnabled",
     "ParameterValue": "true"
   }
 ]
-```
-
-**パラメータ値の自動取得スクリプト（参考）**
-
-```bash
-#!/bin/bash
-# パラメータ値を自動取得してparameters.jsonを生成
-# リージョン: ap-northeast-1 (東京) - AWS CLIのデフォルト設定で指定
-
-MY_IP=$(curl -s https://checkip.amazonaws.com)
-KEYPAIR_NAME="isaac-sim-keypair"
-AMI_ID="ami-XXXXX"  # 実際のAMI IDに置き換え
-
-cat > cloudformation/parameters.json <<EOF
-[
-  {
-    "ParameterKey": "InstanceType",
-    "ParameterValue": "g4dn.xlarge"
-  },
-  {
-    "ParameterKey": "AMIId",
-    "ParameterValue": "$AMI_ID"
-  },
-  {
-    "ParameterKey": "KeyPairName",
-    "ParameterValue": "$KEYPAIR_NAME"
-  },
-  {
-    "ParameterKey": "AllowedSSHCIDR",
-    "ParameterValue": "$MY_IP/32"
-  },
-  {
-    "ParameterKey": "AllowedVNCCIDR",
-    "ParameterValue": "$MY_IP/32"
-  },
-  {
-    "ParameterKey": "VolumeSize",
-    "ParameterValue": "100"
-  },
-  {
-    "ParameterKey": "UseSpotInstance",
-    "ParameterValue": "false"
-  },
-  {
-    "ParameterKey": "SpotInstanceMaxPrice",
-    "ParameterValue": "0.10"
-  },
-  {
-    "ParameterKey": "AutoShutdownEnabled",
-    "ParameterValue": "true"
-  }
-]
-EOF
-
-echo "parameters.json を生成しました"
 ```
 
 ### ステップ3: スタックのデプロイ
+
+**デプロイ前のファイル構成確認**
+
+デプロイスクリプトを実行する前に、必要なファイルが存在することを確認してください：
+
+```bash
+# プロジェクトルートディレクトリにいることを確認
+# （CloudShellでリポジトリをクローンした場合）
+cd physical-ai-learning
+
+# 必要なファイルの存在確認
+ls -la cloudformation/isaac-sim-stack.yaml
+ls -la cloudformation/parameters.json
+ls -la scripts/cloudformation_deploy.sh
+
+# パラメータファイルの内容を確認（AMI IDとキーペア名が正しく設定されているか）
+echo ""
+echo "📋 パラメータファイルの内容:"
+if command -v jq &> /dev/null; then
+  cat cloudformation/parameters.json | jq '.'
+else
+  cat cloudformation/parameters.json
+fi
+```
+
+**確認ポイント：**
+
+- ✅ `cloudformation/isaac-sim-stack.yaml` が存在する
+- ✅ `cloudformation/parameters.json` が存在する
+- ✅ `parameters.json` の `AMIId` が実際のAMI IDに設定されている（`ami-XXXXX` ではない）
+- ✅ `parameters.json` の `KeyPairName` が既存のキーペア名に設定されている
+
+**デプロイ前のdry run検証（推奨）**
+
+実際にリソースを作成する前に、変更内容を確認できます：
+
+```bash
+# 1. テンプレート構文の検証
+echo "📋 テンプレート構文を検証中..."
+aws cloudformation validate-template \
+  --template-body file://cloudformation/isaac-sim-stack.yaml
+
+# 2. 変更セットを作成して変更内容を確認（dry run）
+# 注意: 変更セットは実際にリソースを作成しません
+CHANGE_SET_NAME="dry-run-$(date +%s)"
+
+echo ""
+echo "🔍 変更セットを作成中（dry run）..."
+aws cloudformation create-change-set \
+  --stack-name isaac-sim-stack \
+  --change-set-name $CHANGE_SET_NAME \
+  --template-body file://cloudformation/isaac-sim-stack.yaml \
+  --parameters file://cloudformation/parameters.json \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --change-set-type CREATE
+
+# 変更セットの状態を確認（数秒待ってから実行）
+echo ""
+echo "⏳ 変更セットの準備を待機中..."
+sleep 5
+
+echo ""
+echo "📊 作成されるリソース一覧:"
+aws cloudformation describe-change-set \
+  --stack-name isaac-sim-stack \
+  --change-set-name $CHANGE_SET_NAME \
+  --query 'Changes[*].[Action,LogicalResourceId,ResourceType]' \
+  --output table
+
+# 変更セットを削除（リソースは作成されない）
+echo ""
+echo "🗑️  変更セットを削除中..."
+aws cloudformation delete-change-set \
+  --stack-name isaac-sim-stack \
+  --change-set-name $CHANGE_SET_NAME
+
+echo ""
+echo "✅ dry run検証が完了しました。問題がなければ、次にデプロイを実行してください。"
+```
+
+**既存スタックの更新の場合：**
+
+```bash
+# 更新内容を確認
+CHANGE_SET_NAME="update-dry-run-$(date +%s)"
+
+aws cloudformation create-change-set \
+  --stack-name isaac-sim-stack \
+  --change-set-name $CHANGE_SET_NAME \
+  --template-body file://cloudformation/isaac-sim-stack.yaml \
+  --parameters file://cloudformation/parameters.json \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --change-set-type UPDATE
+
+# 変更内容を確認
+sleep 5
+aws cloudformation describe-change-set \
+  --stack-name isaac-sim-stack \
+  --change-set-name $CHANGE_SET_NAME \
+  --query 'Changes[*].[Action,LogicalResourceId,ResourceType,Replacement]' \
+  --output table
+
+# 変更セットを削除
+aws cloudformation delete-change-set \
+  --stack-name isaac-sim-stack \
+  --change-set-name $CHANGE_SET_NAME
+```
+
+**デプロイの実行**
 
 ```bash
 ./scripts/cloudformation_deploy.sh
@@ -470,7 +411,7 @@ aws cloudformation delete-stack \
 - `AllowedVNCCIDR`: VNC接続許可CIDR（推奨: 自分のIP/32）
 - `VolumeSize`: EBSボリュームサイズ（GB、20-1000の範囲）
 - `UseSpotInstance`: スポットインスタンス使用（`true`/`false`）
-- `SpotInstanceMaxPrice`: スポットインスタンス最大価格（USD/時）
+- `SpotInstanceMaxPrice`: スポットインスタンス最大価格（USD/時）。空文字列（`""`）にすると、オンデマンド価格が自動的に使用されます
 - `AutoShutdownEnabled`: 自動シャットダウン有効化（`true`/`false`）
 
 ### 出力
@@ -520,14 +461,17 @@ aws cloudformation update-stack \
 ### エラー: スタックが作成できない
 
 **原因1: IAM権限不足**
+
 - CloudFormation、EC2、IAMの権限が必要
 - `CAPABILITY_NAMED_IAM` を指定
 
 **原因2: リソース制限**
+
 - インスタンスタイプのクォータ制限
 - セキュリティグループ数の制限
 
 **原因3: AMI IDが無効**
+
 - リージョンとAMI IDが一致しているか確認
 
 ### エラー: スタックがロールバックする
@@ -576,4 +520,3 @@ aws ssm start-session --target i-0123456789abcdef0
 - [AWS CloudFormation Documentation](https://docs.aws.amazon.com/cloudformation/)
 - [CloudFormation Template Reference](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-reference.html)
 - [AWS CDK Documentation](https://docs.aws.amazon.com/cdk/)
-
