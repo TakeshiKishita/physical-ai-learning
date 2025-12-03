@@ -163,9 +163,9 @@ echo "CIDR format: $MY_IP/32"
 | `KeyPairName` | EC2キーペア名 | 上記1-1を参照 | 要設定 |
 | `AllowedSSHCIDR` | SSH接続許可CIDR | 上記1-3を参照 | `0.0.0.0/0`（全許可） |
 | `AllowedVNCCIDR` | VNC接続許可CIDR | 上記1-3を参照 | `0.0.0.0/0`（全許可） |
-| `VolumeSize` | EBSボリュームサイズ（GB） | 20-1000の範囲で指定 | `100` |
+| `VolumeSize` | EBSボリュームサイズ（GB） | 128-1000の範囲で指定 | `150` |
 | `UseSpotInstance` | スポットインスタンス使用 | `true`（コスト削減）または`false` | `false` |
-| `SpotInstanceMaxPrice` | スポットインスタンス最大価格（USD/時） | 空文字列（`""`）でオンデマンド価格を自動使用 | `""`（空文字列） |
+| `SpotInstanceMaxPrice` | スポットインスタンス最大価格（USD/時） | 空文字列（`""`）でオンデマンド価格を自動使用 | `"0.10"` |
 | `AutoShutdownEnabled` | 自動シャットダウン有効化 | `true`（推奨）または`false` | `true` |
 
 **SpotInstanceMaxPriceの確認方法**
@@ -211,7 +211,7 @@ echo "CIDR format: $MY_IP/32"
   },
   {
     "ParameterKey": "VolumeSize",
-    "ParameterValue": "100"
+    "ParameterValue": "150"
   },
   {
     "ParameterKey": "UseSpotInstance",
@@ -219,7 +219,7 @@ echo "CIDR format: $MY_IP/32"
   },
   {
     "ParameterKey": "SpotInstanceMaxPrice",
-    "ParameterValue": ""
+    "ParameterValue": "0.10"
   },
   {
     "ParameterKey": "AutoShutdownEnabled",
@@ -290,13 +290,20 @@ echo ""
 echo "⏳ 変更セットの準備を待機中..."
 sleep 5
 
+# まずステータスを確認
 echo ""
-echo "📊 作成されるリソース一覧:"
+echo "📊 変更セットのステータス:"
 aws cloudformation describe-change-set \
   --stack-name isaac-sim-stack \
   --change-set-name $CHANGE_SET_NAME \
-  --query 'Changes[*].[Action,LogicalResourceId,ResourceType]' \
-  --output table
+  --query '[Status,StatusReason]'
+
+# 変更内容の詳細を表示
+echo ""
+echo "📋 作成されるリソース一覧:"
+aws cloudformation describe-change-set \
+  --stack-name isaac-sim-stack \
+  --change-set-name $CHANGE_SET_NAME
 
 # 変更セットを削除（リソースは作成されない）
 echo ""
@@ -323,13 +330,9 @@ aws cloudformation create-change-set \
   --capabilities CAPABILITY_NAMED_IAM \
   --change-set-type UPDATE
 
-# 変更内容を確認
-sleep 5
 aws cloudformation describe-change-set \
   --stack-name isaac-sim-stack \
-  --change-set-name $CHANGE_SET_NAME \
-  --query 'Changes[*].[Action,LogicalResourceId,ResourceType,Replacement]' \
-  --output table
+  --change-set-name $CHANGE_SET_NAME
 
 # 変更セットを削除
 aws cloudformation delete-change-set \
@@ -409,7 +412,7 @@ aws cloudformation delete-stack \
 - `KeyPairName`: キーペア名（既存のキーペアが必要）
 - `AllowedSSHCIDR`: SSH接続許可CIDR（推奨: 自分のIP/32）
 - `AllowedVNCCIDR`: VNC接続許可CIDR（推奨: 自分のIP/32）
-- `VolumeSize`: EBSボリュームサイズ（GB、20-1000の範囲）
+- `VolumeSize`: EBSボリュームサイズ（GB、128-1000の範囲、最小128GB必須）
 - `UseSpotInstance`: スポットインスタンス使用（`true`/`false`）
 - `SpotInstanceMaxPrice`: スポットインスタンス最大価格（USD/時）。空文字列（`""`）にすると、オンデマンド価格が自動的に使用されます
 - `AutoShutdownEnabled`: 自動シャットダウン有効化（`true`/`false`）
