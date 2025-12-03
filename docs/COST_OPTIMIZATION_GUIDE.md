@@ -92,7 +92,8 @@
 
 ### 5. EBSボリュームの最適化
 
-- **最小サイズ**: 20GBから開始（必要に応じて拡張）
+- **最小サイズ**: 128GB（Isaac Sim AMI要件）
+- **推奨サイズ**: 150GB（快適な使用のため）
 - **gp3タイプ**: デフォルトでgp3（コスト効率が良い）
 - **削除設定**: `DeleteOnTermination: true` で不要なボリュームを自動削除
 
@@ -191,7 +192,7 @@ aws budgets create-budget \
 
 1. CloudWatchアラームを確認
 2. IAM権限を確認
-3. Lambda関数のログを確認
+3. アラームのステータスを確認: `aws cloudwatch describe-alarms`
 
 ### コストが予想より高い
 
