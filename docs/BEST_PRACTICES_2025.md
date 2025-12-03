@@ -1,8 +1,8 @@
-# Isaac Sim AWS環境構築 - ベストプラクティス 2024
+# Isaac Sim AWS環境構築 - ベストプラクティス 2025
 
 NVIDIAとAWSの最新ベストプラクティスに基づいた、Isaac Sim環境構築ガイドです。
 
-## 最新の推奨事項（2024年）
+## 最新の推奨事項（2025年）
 
 ### 1. インスタンスタイプの選択
 
@@ -70,7 +70,7 @@ NVIDIAフォーラムで推奨されている最適化:
 InstanceType: g4dn.xlarge
 UseSpotInstance: true
 AutoShutdownEnabled: true
-VolumeSize: 100GB (最小)
+VolumeSize: 150 # 推奨、最小128GB
 ```
 
 ## プロジェクトの準拠状況
@@ -86,7 +86,7 @@ VolumeSize: 100GB (最小)
 ### 🔄 改善済み項目
 
 1. **スポットインスタンスサポート**: 追加済み
-2. **自動停止機能**: 追加済み（CloudWatch + Lambda）
+2. **自動停止機能**: 追加済み（CloudWatch Alarm → EC2 Stop Action）
 3. **最新インスタンスタイプ**: G6e追加
 4. **コスト最適化ドキュメント**: 作成済み
 
@@ -137,7 +137,7 @@ VolumeSize: 100GB (最小)
   "InstanceType": "g4dn.xlarge",
   "UseSpotInstance": "true",
   "AutoShutdownEnabled": "true",
-  "VolumeSize": "100"
+  "VolumeSize": "150"
 }
 ```
 
@@ -150,7 +150,7 @@ VolumeSize: 100GB (最小)
   "InstanceType": "g4dn.xlarge",
   "UseSpotInstance": "false",
   "AutoShutdownEnabled": "true",
-  "VolumeSize": "100"
+  "VolumeSize": "150"
 }
 ```
 
@@ -163,7 +163,7 @@ VolumeSize: 100GB (最小)
   "InstanceType": "g6e.xlarge",
   "UseSpotInstance": "true",
   "AutoShutdownEnabled": "true",
-  "VolumeSize": "100"
+  "VolumeSize": "150"
 }
 ```
 
