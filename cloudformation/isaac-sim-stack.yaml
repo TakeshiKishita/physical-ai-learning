@@ -199,13 +199,6 @@ Resources:
       InstanceMarketOptions: !If
         - UseSpotInstance
         - MarketType: spot
-          SpotOptions:
-            MaxPrice: !If
-              - HasSpotPrice
-              - !Ref SpotInstanceMaxPrice
-              - !Ref AWS::NoValue
-            SpotInstanceType: persistent
-            InstanceInterruptionBehavior: stop
         - !Ref AWS::NoValue
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
