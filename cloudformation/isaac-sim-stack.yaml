@@ -134,8 +134,25 @@ Resources:
           FromPort: 5900
           ToPort: 5910
           CidrIp: !Ref AllowedVNCCIDR
-          Description: VNC/DCV access for remote desktop
-      # SecurityGroupEgress は削除（デフォルトVPCでは自動的に全アウトバウンドトラフィックが許可される）
+          Description: VNC access for remote desktop
+        # Omniverse WebRTC Streaming (HTTP/WebSocket)
+        - IpProtocol: tcp
+          FromPort: 8899
+          ToPort: 8899
+          CidrIp: !Ref AllowedVNCCIDR
+          Description: Omniverse Kit Remote (WebRTC) HTTP port
+        # Omniverse WebRTC Streaming (Media)
+        - IpProtocol: udp
+          FromPort: 49000
+          ToPort: 49100
+          CidrIp: !Ref AllowedVNCCIDR
+          Description: Omniverse Kit Remote (WebRTC) Media ports
+        - IpProtocol: tcp
+          FromPort: 49000
+          ToPort: 49100
+          CidrIp: !Ref AllowedVNCCIDR
+          Description: Omniverse Kit Remote (WebRTC) Media ports
+      # SecurityGroupEgress is automatically allowed
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-sg'
@@ -144,7 +161,7 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
   
-  # IAM Role (Systems Manager Session Manager用)
+  # IAM Role (Systems Manager Session Manager)
   IsaacSimInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -199,6 +216,9 @@ Resources:
       InstanceMarketOptions: !If
         - UseSpotInstance
         - MarketType: spot
+          SpotOptions:
+            MaxPrice: !If [HasSpotPrice, !Ref SpotInstanceMaxPrice, !Ref AWS::NoValue]
+            SpotInstanceType: one-time
         - !Ref AWS::NoValue
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
@@ -206,8 +226,28 @@ Resources:
             VolumeSize: !Ref VolumeSize
             VolumeType: gp3
             Iops: 3000
+            Throughput: 125
             Encrypted: true
             DeleteOnTermination: true
+      # UserData to log startup and check GPU
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          echo "Starting user data script..."
+          
+          # Check NVIDIA Driver
+          if command -v nvidia-smi &> /dev/null; then
+            echo "NVIDIA Driver found:"
+            nvidia-smi
+            nvidia-smi > /var/log/nvidia-smi-boot.log
+          else
+            echo "NVIDIA Driver NOT found!"
+          fi
+          
+          # Install basic tools if needed
+          apt-get update && apt-get install -y htop tmux jq
+          
+          echo "User data script completed."
       Monitoring: true
       MetadataOptions:
         HttpEndpoint: enabled

@@ -140,6 +140,16 @@ echo "CIDR format: $MY_IP/32"
 
 **注意**: 自宅やオフィスから接続する場合、IPアドレスが変わる可能性があります。その場合は`0.0.0.0/0`（すべてのIPを許可）を使用できますが、セキュリティリスクが高くなります。
 
+#### 1-5. Omniverse Streaming Clientの準備
+
+Isaac Simをリモートで快適に操作するために、**Omniverse Streaming Client** の使用を推奨します。テンプレートでは以下のポートが開放されます：
+
+- **TCP 8899**: Omniverse Kit Remote (HTTP/WebSocket)
+- **TCP/UDP 49000-49100**: WebRTC Media Streaming
+- **TCP 5900-5910**: VNC (予備手段として維持)
+
+これにより、ブラウザベースのWebRTCストリーミングや、ネイティブクライアントによる低遅延な操作が可能になります。
+
 #### 1-4. インスタンスタイプの選択
 
 テンプレートで利用可能なインスタンスタイプ：
@@ -226,7 +236,10 @@ echo "CIDR format: $MY_IP/32"
     "ParameterValue": "true"
   }
 ]
+
 ```
+
+**※注記**: `AllowedVNCCIDR` パラメータは、VNCポートだけでなく、Omniverse Streaming Client用のWebRTCポート（TCP/UDP 49000-49100, TCP 8899）の許可IP範囲としても使用されます。
 
 ### ステップ3: スタックのデプロイ
 
@@ -313,7 +326,11 @@ aws cloudformation delete-change-set \
   --change-set-name $CHANGE_SET_NAME
 
 echo ""
-echo "✅ dry run検証が完了しました。問題がなければ、次にデプロイを実行してください。"
+echo "✅ dry run検証が完了しました。"
+echo "⚠️ 新規作成(CREATE)のdry runの場合、スタックが 'REVIEW_IN_PROGRESS' 状態で残ります。"
+echo "   本番デプロイの前に必ず以下のコマンドでスタックを削除してください:"
+echo "   aws cloudformation delete-stack --stack-name isaac-sim-stack"
+
 ```
 
 **既存スタックの更新の場合：**
@@ -340,7 +357,22 @@ aws cloudformation delete-change-set \
   --change-set-name $CHANGE_SET_NAME
 ```
 
-**デプロイの実行**
+#### デプロイの実行
+
+**⚠️ 重要: 事前のクリーンアップ**
+
+新規作成の dry run を行った場合や、以前のデプロイが中断した場合、スタックが `REVIEW_IN_PROGRESS` や `ROLLBACK_COMPLETE` の状態で残っていることがあります。
+この状態では新規デプロイ（作成）が失敗するため、**必ずスタックを削除してから**実行してください。
+
+```bash
+# 残留しているスタックを削除
+aws cloudformation delete-stack --stack-name isaac-sim-stack
+
+# 削除完了を確認（エラーが出れば削除済み）
+aws cloudformation describe-stacks --stack-name isaac-sim-stack
+```
+
+**デプロイコマンドの実行**
 
 ```bash
 ./scripts/cloudformation_deploy.sh
@@ -404,6 +436,7 @@ aws cloudformation delete-stack \
 - **IsaacSimInstanceRole**: IAMロール（Systems Manager用）
 - **IsaacSimInstanceProfile**: IAMインスタンスプロファイル
 - **IsaacSimInstance**: EC2インスタンス
+  - **UserData**: 起動時にNVIDIAドライバの状態確認と基本ツールのインストールを実行
 
 ### パラメータ
 
@@ -411,10 +444,10 @@ aws cloudformation delete-stack \
 - `AMIId`: Isaac Sim用AMI ID（リージョン固有）
 - `KeyPairName`: キーペア名（既存のキーペアが必要）
 - `AllowedSSHCIDR`: SSH接続許可CIDR（推奨: 自分のIP/32）
-- `AllowedVNCCIDR`: VNC接続許可CIDR（推奨: 自分のIP/32）
-- `VolumeSize`: EBSボリュームサイズ（GB、128-1000の範囲、最小128GB必須）
+- `AllowedVNCCIDR`: リモートアクセス用CIDR。VNC(5900-5910)に加え、Omniverse Streaming(8899, 49000-49100)もこのCIDRで制御されます。
+- `VolumeSize`: EBSボリュームサイズ（GB、128-1000の範囲、最小128GB必須）。**gp3** タイプを使用します。
 - `UseSpotInstance`: スポットインスタンス使用（`true`/`false`）
-- `SpotInstanceMaxPrice`: スポットインスタンス最大価格（USD/時）。空文字列（`""`）にすると、オンデマンド価格が自動的に使用されます
+- `SpotInstanceMaxPrice`: スポットインスタンス最大価格（USD/時）。空文字列でオンデマンド価格。正しく設定することで `SpotOptions` に反映されます。
 - `AutoShutdownEnabled`: 自動シャットダウン有効化（`true`/`false`）
 
 ### 出力
