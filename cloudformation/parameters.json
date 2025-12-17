@@ -1,7 +1,7 @@
 [
   {
     "ParameterKey": "InstanceType",
-    "ParameterValue": "g4dn.xlarge"
+    "ParameterValue": "g4dn.2xlarge"
   },
   {
     "ParameterKey": "AMIId",

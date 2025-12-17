@@ -9,20 +9,22 @@ NVIDIAとAWSの最新ベストプラクティスに基づいた、Isaac Sim環�
 #### NVIDIA推奨: G6eインスタンス（L40S GPU）
 
 **最新の推奨構成**:
+
 - **g6e.xlarge**: NVIDIA L40S GPU搭載
 - **性能**: g4dnの約2倍
 - **用途**: 本番環境、高性能が必要な場合
 
 **個人学習用推奨**:
-- **g4dn.xlarge**: T4 GPU搭載
-- **コスト**: 約半分
+
+- **g4dn.2xlarge**: T4 GPU搭載, 32GB RAM
+- **コスト**: それでも学習用としては最適
 - **用途**: 学習・開発環境
 
 #### インスタンス比較
 
 | タイプ | GPU | 性能 | コスト/時間 | 推奨用途 |
 |--------|-----|------|------------|---------|
-| g4dn.xlarge | T4 | 標準 | ~$0.526 | ⭐ 個人学習 |
+| g4dn.2xlarge | T4 | 標準 | ~$1.05 | ⭐ 個人学習 |
 | g6e.xlarge | L40S | 2倍 | ~$1.20+ | 本番・高性能 |
 
 ### 2. Isaac Simの最適化
@@ -62,12 +64,12 @@ NVIDIAフォーラムで推奨されている最適化:
 
 1. **スポットインスタンス**: 最大90%削減
 2. **自動停止**: 使用していない時は停止
-3. **適切なインスタンスサイズ**: g4dn.xlargeで十分
+3. **適切なインスタンスサイズ**: g4dn.2xlarge (AMI最小要件)
 
 #### 推奨設定
 
 ```yaml
-InstanceType: g4dn.xlarge
+InstanceType: g4dn.2xlarge
 UseSpotInstance: true
 AutoShutdownEnabled: true
 VolumeSize: 150 # 推奨、最小128GB
@@ -134,27 +136,27 @@ VolumeSize: 150 # 推奨、最小128GB
 
 ```json
 {
-  "InstanceType": "g4dn.xlarge",
+  "InstanceType": "g4dn.2xlarge",
   "UseSpotInstance": "true",
   "AutoShutdownEnabled": "true",
   "VolumeSize": "150"
 }
 ```
 
-**月額コスト**: 約 $20-30（1日2-3時間使用）
+**月額コスト**: 約 $40-60（1日2-3時間使用）
 
 ### バランス構成
 
 ```json
 {
-  "InstanceType": "g4dn.xlarge",
+  "InstanceType": "g4dn.2xlarge",
   "UseSpotInstance": "false",
   "AutoShutdownEnabled": "true",
   "VolumeSize": "150"
 }
 ```
 
-**月額コスト**: 約 $60-80（1日4-5時間使用）
+**月額コスト**: 約 $120-160（1日4-5時間使用）
 
 ### 高性能構成（必要時のみ）
 
@@ -189,4 +191,3 @@ VolumeSize: 150 # 推奨、最小128GB
 5. ✅ **学習効率**: 最小コストで最大の学習効果
 
 **個人学習用としては最強のソリューション**と言えます。
-

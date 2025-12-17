@@ -25,17 +25,20 @@ NVIDIA Isaac Sim を実行するための **GPU 搭載 EC2 インスタンス環
 ### 主要機能
 
 #### 🎯 コア機能
+
 - ✅ **GPU インスタンス** - g4dn/g5/g6e シリーズから選択可能
 - ✅ **SSH/VNC アクセス** - リモート接続対応
 - ✅ **Systems Manager** - キーペア不要のブラウザ接続
 - ✅ **暗号化 EBS** - データ保護
 
 #### 💰 コスト最適化
+
 - 🔧 **自動シャットダウン** - CPU低使用率2時間で自動停止
 - 🔧 **スポットインスタンス対応** - 最大90%割引（中断リスクあり）
 - 🔧 **gp3 ストレージ** - gp2より20%安価
 
 #### 🔒 セキュリティ
+
 - 🔐 **IMDSv2 強制** - SSRF攻撃対策
 - 🔐 **EBS 暗号化** - データ保護
 - 🔐 **アクセス制限** - SSH/VNC を CIDR で制限可能
@@ -45,7 +48,7 @@ NVIDIA Isaac Sim を実行するための **GPU 搭載 EC2 インスタンス環
 
 | カテゴリ | パラメータ | デフォルト値 |
 |---------|-----------|-------------|
-| **インスタンス** | InstanceType | `g4dn.xlarge` |
+| **インスタンス** | InstanceType | `g4dn.2xlarge` |
 | | AMIId | `ami-XXXXX`（要変更） |
 | | KeyPairName | （必須入力） |
 | | VolumeSize | `150` GB |
@@ -71,9 +74,9 @@ NVIDIA Isaac Sim を実行するための **GPU 搭載 EC2 インスタンス環
 
 | 構成 | EC2料金/月 | EBS料金/月 | 合計/月 |
 |------|-----------|-----------|---------|
-| **g4dn.xlarge（常時稼働）** | ~¥52,000 | ~¥2,000 | ~¥54,000 |
-| **g4dn.xlarge（8h/日）** | ~¥17,000 | ~¥2,000 | ~¥19,000 |
-| **スポット + 自動停止** | ~¥1,700-¥5,100 | ~¥2,000 | **~¥3,700-¥7,100** |
+| **g4dn.2xlarge（常時稼働）** | ~¥104,000 | ~¥2,000 | ~¥106,000 |
+| **g4dn.2xlarge（8h/日）** | ~¥35,000 | ~¥2,000 | ~¥37,000 |
+| **スポット + 自動停止** | ~¥3,500-¥10,000 | ~¥2,000 | **~¥5,500-¥12,000** |
 
 > [!TIP]
 > スポットインスタンス + 自動シャットダウンで **最大95%削減** 可能
@@ -83,13 +86,16 @@ NVIDIA Isaac Sim を実行するための **GPU 搭載 EC2 インスタンス環
 ## 📋 テンプレート基本情報
 
 ### AWSTemplateFormatVersion
+
 - **値**: `2010-09-09`
 - CloudFormation テンプレート形式のバージョン（現在これのみ）
 
 ### Description
+
 ```
 Isaac Sim EC2 Instance Stack for Physical AI Learning - Latest best practices
 ```
+
 スタックの説明文。コンソールに表示される。
 
 ---
@@ -125,15 +131,16 @@ AWS コンソールでパラメータ入力画面のUI配置を定義
 | 項目 | 値 |
 |------|-----|
 | **Type** | `String` |
-| **Default** | `g4dn.xlarge` |
-| **AllowedValues** | `g4dn.xlarge`, `g4dn.2xlarge`, `g5.xlarge`, `g6e.xlarge`, `g6e.2xlarge` |
+| **Default** | `g4dn.2xlarge` |
+| **AllowedValues** | `g4dn.2xlarge`, `g4dn.4xlarge`, `g5.xlarge`, `g5.2xlarge`, `g6e.xlarge`, `g6e.2xlarge` |
 
 **説明:**
+
 ```
 EC2 instance type for Isaac Sim.
-- g4dn.xlarge: Cost-effective, older generation (T4 GPU)
+- g4dn.2xlarge: Minimum required for Isaac Sim AMI (T4 GPU, 32GB RAM)
 - g6e.xlarge: Latest generation with L40S GPU (2x performance, higher cost)
-- For learning: g4dn.xlarge recommended for cost savings
+- Note: g4dn.xlarge is NOT supported by the AMI.
 ```
 
 ---
@@ -200,6 +207,7 @@ VNC/DCV（ポート5900-5910）へのアクセス許可範囲。
 | **MaxValue** | `1000` |
 
 **説明:**
+
 ```
 Size of the root EBS volume in GB.
 Minimum 128GB required for Isaac Sim AMI.
@@ -217,6 +225,7 @@ Recommended: 150GB for comfortable usage.
 | **AllowedValues** | `'true'`, `'false'` |
 
 **説明:**
+
 ```
 Use Spot Instance for cost savings (up to 90% discount).
 Warning: Spot instances can be interrupted. Recommended for learning/testing.
@@ -232,6 +241,7 @@ Warning: Spot instances can be interrupted. Recommended for learning/testing.
 | **Default** | `'0.10'` |
 
 **説明:**
+
 ```
 Maximum price per hour for Spot Instance (USD).
 Leave empty to use current On-Demand price.
@@ -251,6 +261,7 @@ Only used when UseSpotInstance is 'true'
 | **AllowedValues** | `'true'`, `'false'` |
 
 **説明:**
+
 ```
 Enable automatic shutdown after idle time to save costs.
 Uses CloudWatch alarm to stop instance after 2 hours of low CPU usage.
@@ -261,21 +272,27 @@ Uses CloudWatch alarm to stop instance after 2 hours of low CPU usage.
 ## 🔀 Conditions
 
 ### 1. UseSpotInstance
+
 ```yaml
 !Equals [!Ref UseSpotInstance, 'true']
 ```
+
 スポットインスタンス機能の有効化判定。
 
 ### 2. HasSpotPrice
+
 ```yaml
 !Not [!Equals [!Ref SpotInstanceMaxPrice, '']]
 ```
+
 スポット価格上限の設定有無を判定。
 
 ### 3. AutoShutdownEnabled
+
 ```yaml
 !Equals [!Ref AutoShutdownEnabled, 'true']
 ```
+
 自動シャットダウンアラームの作成判定。
 
 ---
@@ -296,6 +313,7 @@ Uses CloudWatch alarm to stop instance after 2 hours of low CPU usage.
 #### SecurityGroupIngress（インバウンドルール）
 
 **ルール1: SSH**
+
 ```yaml
 - IpProtocol: tcp
   FromPort: 22
@@ -305,6 +323,7 @@ Uses CloudWatch alarm to stop instance after 2 hours of low CPU usage.
 ```
 
 **ルール2: VNC**
+
 ```yaml
 - IpProtocol: tcp
   FromPort: 5900
@@ -314,6 +333,7 @@ Uses CloudWatch alarm to stop instance after 2 hours of low CPU usage.
 ```
 
 #### Tags
+
 - `Name: ${AWS::StackName}-sg`
 - `Project: physical-ai-learning`
 - `ManagedBy: CloudFormation`
@@ -334,6 +354,7 @@ Uses CloudWatch alarm to stop instance after 2 hours of low CPU usage.
 | `RoleName` | `${AWS::StackName}-instance-role` |
 
 #### AssumeRolePolicyDocument
+
 ```yaml
 Version: '2012-10-17'
 Statement:
@@ -342,12 +363,15 @@ Statement:
       Service: ec2.amazonaws.com
     Action: sts:AssumeRole
 ```
+
 EC2サービスがこのロールを引き受け可能。
 
 #### ManagedPolicyArns
+
 ```yaml
 - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
 ```
+
 Systems Manager Session Manager でのアクセスを許可。
 
 #### Policies
@@ -355,6 +379,7 @@ Systems Manager Session Manager でのアクセスを許可。
 **PolicyName:** `CloudWatchAgentServerPolicy`
 
 **許可されるアクション:**
+
 - `cloudwatch:PutMetricData` - メトリクス送信
 - `cloudwatch:GetMetricStatistics` - メトリクス取得
 - `cloudwatch:ListMetrics` - メトリクス一覧
@@ -366,6 +391,7 @@ Systems Manager Session Manager でのアクセスを許可。
 **Resource:** `*`（すべてのリソース）
 
 #### Tags
+
 - `Project: physical-ai-learning`
 - `ManagedBy: CloudFormation`
 
@@ -401,15 +427,18 @@ IAMロールをEC2インスタンスにアタッチするためのラッパー�
 | `IamInstanceProfile` | `!Ref IsaacSimInstanceProfile` |
 
 #### InstanceMarketOptions（条件付き）
+
 ```yaml
 !If
   - UseSpotInstance
   - MarketType: spot
   - !Ref AWS::NoValue
 ```
+
 `UseSpotInstance='true'` の場合のみスポットインスタンスとして起動。
 
 #### BlockDeviceMappings
+
 ```yaml
 - DeviceName: /dev/sda1
   Ebs:
@@ -429,12 +458,15 @@ IAMロールをEC2インスタンスにアタッチするためのラッパー�
 | `DeleteOnTermination` | `true` | インスタンス削除時にボリュームも削除 |
 
 #### Monitoring
+
 ```yaml
 Monitoring: true
 ```
+
 詳細モニタリング有効（1分間隔のメトリクス収集）。
 
 #### MetadataOptions
+
 ```yaml
 HttpEndpoint: enabled
 HttpTokens: required
@@ -489,22 +521,28 @@ HttpPutResponseHopLimit: 1
 | `ComparisonOperator` | `LessThanThreshold` | 閾値未満 |
 
 #### Dimensions
+
 ```yaml
 - Name: InstanceId
   Value: !Ref IsaacSimInstance
 ```
+
 監視対象インスタンスを指定。
 
 #### AlarmActions
+
 ```yaml
 - !Sub 'arn:aws:automate:${AWS::Region}:ec2:stop'
 ```
+
 アラーム発動時にEC2インスタンスを**停止**（終了ではない）。
 
 #### TreatMissingData
+
 ```yaml
 TreatMissingData: notBreaching
 ```
+
 メトリクスデータが欠損している場合、アラーム状態とみなさない。
 
 > [!NOTE]
@@ -629,6 +667,7 @@ AWSコンソールでスタックを直接開くリンク。
 出力1-4は `Export.Name` を持ち、他のCloudFormationスタックから `!ImportValue` で参照可能です。
 
 **例:**
+
 ```yaml
 # 別スタックから参照
 SecurityGroups:
@@ -672,13 +711,16 @@ SecurityGroups:
 ## 💰 コスト最適化の仕組み
 
 ### 1. 自動シャットダウン（AutoShutdownAlarm）
+
 - CPU 5%未満 × 2時間 → 自動停止
 - 停止中: EC2料金 ¥0、EBS料金のみ
 
 ### 2. スポットインスタンス（InstanceMarketOptions）
+
 - 最大90%割引
 - 中断リスクあり（2分前通知）
 
 ### 3. gp3 EBS
+
 - gp2より20%安価
 - 3000 IOPSを追加料金なしで提供

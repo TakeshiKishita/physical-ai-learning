@@ -154,8 +154,9 @@ Isaac Simをリモートで快適に操作するために、**Omniverse Streamin
 
 テンプレートで利用可能なインスタンスタイプ：
 
-- `g4dn.xlarge`: コスト効率が良い、旧世代（T4 GPU）- **学習用途に推奨**
-- `g4dn.2xlarge`: g4dn.xlargeの2倍の性能
+- `g4dn.2xlarge`: **最小推奨要件** (T4 GPU, 32GB RAM)。学習用途に推奨。
+  - **注意**: `g4dn.xlarge` (16GB RAM) は AMI のサポート対象外です。
+- `g4dn.4xlarge`: g4dn.2xlargeの2倍の性能
 - `g5.xlarge`: 新世代（A10G GPU）
 - `g6e.xlarge`: 最新世代（L40S GPU、2倍の性能、高コスト）
 - `g6e.2xlarge`: g6e.xlargeの2倍の性能
@@ -168,7 +169,7 @@ Isaac Simをリモートで快適に操作するために、**Omniverse Streamin
 
 | パラメータ | 説明 | 取得方法 | デフォルト値 |
 |-----------|------|---------|------------|
-| `InstanceType` | EC2インスタンスタイプ | 上記1-4を参照 | `g4dn.xlarge` |
+| `InstanceType` | EC2インスタンスタイプ | 上記1-4を参照 | `g4dn.2xlarge` |
 | `AMIId` | Isaac Sim用AMI ID | 上記1-2を参照 | `ami-XXXXX`（要変更） |
 | `KeyPairName` | EC2キーペア名 | 上記1-1を参照 | 要設定 |
 | `AllowedSSHCIDR` | SSH接続許可CIDR | 上記1-3を参照 | `0.0.0.0/0`（全許可） |
@@ -185,7 +186,7 @@ Isaac Simをリモートで快適に操作するために、**Omniverse Streamin
 1. [EC2コンソール](https://ap-northeast-1.console.aws.amazon.com/ec2/)にアクセス
 2. 左メニューから「スポットリクエスト」→「リクエスト」を選択
 3. 「スポットインスタンスをリクエスト」をクリック
-4. インスタンスタイプ（例: `g4dn.xlarge`）を選択
+4. インスタンスタイプ（例: `g4dn.2xlarge`）を選択
 5. 「価格履歴」タブで現在のスポット価格を確認
 6. オンデマンド価格も表示されるので、それを参考に設定
 
@@ -201,7 +202,7 @@ Isaac Simをリモートで快適に操作するために、**Omniverse Streamin
 [
   {
     "ParameterKey": "InstanceType",
-    "ParameterValue": "g4dn.xlarge"
+    "ParameterValue": "g4dn.2xlarge"
   },
   {
     "ParameterKey": "AMIId",
@@ -440,7 +441,7 @@ aws cloudformation delete-stack \
 
 ### パラメータ
 
-- `InstanceType`: インスタンスタイプ（g4dn.xlarge等）
+- `InstanceType`: インスタンスタイプ（g4dn.2xlarge等）
 - `AMIId`: Isaac Sim用AMI ID（リージョン固有）
 - `KeyPairName`: キーペア名（既存のキーペアが必要）
 - `AllowedSSHCIDR`: SSH接続許可CIDR（推奨: 自分のIP/32）

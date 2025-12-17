@@ -33,18 +33,19 @@ Metadata:
 Parameters:
   InstanceType:
     Type: String
-    Default: g4dn.xlarge
+    Default: g4dn.2xlarge
     AllowedValues:
-      - g4dn.xlarge
       - g4dn.2xlarge
+      - g4dn.4xlarge
       - g5.xlarge
+      - g5.2xlarge
       - g6e.xlarge
       - g6e.2xlarge
     Description: |
       EC2 instance type for Isaac Sim.
-      - g4dn.xlarge: Cost-effective, older generation (T4 GPU)
+      - g4dn.2xlarge: Minimum required for Isaac Sim AMI (T4 GPU, 32GB RAM)
       - g6e.xlarge: Latest generation with L40S GPU (2x performance, higher cost)
-      - For learning: g4dn.xlarge recommended for cost savings
+      - Note: g4dn.xlarge is NOT supported by the AMI.
   
   AMIId:
     Type: String
