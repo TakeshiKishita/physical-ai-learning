@@ -87,7 +87,8 @@ cd ~/physical-ai-learning
 ```
 
 出力例：
-```
+
+```bash
 Instance ID: i-0123456789abcdef0
 Public IP: 203.0.113.42
 SSH Command: ssh -i ~/.ssh/isaac-sim-keypair.pem ubuntu@203.0.113.42
@@ -110,7 +111,7 @@ echo "" >> logs/week1_env_checklist.md
 
 #### 1. EC2 インスタンスにリモート接続
 
-**方法A: SSH + VNC（推奨）**
+##### 方法A: SSH + VNC（推奨）
 
 ```bash
 # SSH接続
@@ -121,9 +122,10 @@ vncserver :1 -geometry 1920x1080 -depth 24
 ```
 
 ローカルPCから VNC クライアント（TigerVNC, RealVNC等）で接続：
+
 - アドレス: `<PUBLIC_IP>:5901`
 
-**方法B: AWS Systems Manager Session Manager**
+##### 方法B: AWS Systems Manager Session Manager
 
 ```bash
 # SSH鍵不要でブラウザから接続
@@ -146,7 +148,7 @@ cd ~/isaac-sim
 3. `Create > Mesh > Cube` で **Box** を追加（床の上・少し上に配置）
 4. **Play** ボタン（▶）を押し、Box が重力で落下・床と衝突する様子を確認
 
-####  4. 観察内容を記録
+#### 4. 観察内容を記録
 
 ```markdown
 ## 物理シミュレーション観察メモ
@@ -224,7 +226,8 @@ echo "Stopped instance: <INSTANCE_ID>" >> logs/week1_env_checklist.md
 echo "Terminated CloudFormation stack" >> logs/week1_env_checklist.md
 ```
 
-> **Note**: 
+> **Note**:
+>
 > - **停止**: データ保持、再起動可能、EBS料金のみ
 > - **削除**: すべて削除、データ消失、課金完全停止
 
