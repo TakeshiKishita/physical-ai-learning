@@ -332,7 +332,7 @@ Uses CloudWatch alarm to stop instance after 2 hours of low CPU usage.
   Description: VNC/DCV access for remote desktop
 ```
 
-#### Tags
+#### Tags (Security Group)
 
 - `Name: ${AWS::StackName}-sg`
 - `Project: physical-ai-learning`
@@ -390,7 +390,7 @@ Systems Manager Session Manager でのアクセスを許可。
 
 **Resource:** `*`（すべてのリソース）
 
-#### Tags
+#### Tags (IAM Role)
 
 - `Project: physical-ai-learning`
 - `ManagedBy: CloudFormation`
@@ -482,7 +482,7 @@ HttpPutResponseHopLimit: 1
 > [!IMPORTANT]
 > IMDSv2 必須化により、SSRF攻撃のリスクを軽減します。
 
-#### Tags
+#### Tags (Instance)
 
 | キー | 値 |
 |------|-----|
