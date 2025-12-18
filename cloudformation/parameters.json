@@ -5,7 +5,7 @@
   },
   {
     "ParameterKey": "AMIId",
-    "ParameterValue": "ami-083436b6b99e9e44e"
+    "ParameterValue": "ami-089e22c42ee7843a2"
   },
   {
     "ParameterKey": "KeyPairName",
@@ -25,7 +25,7 @@
   },
   {
     "ParameterKey": "UseSpotInstance",
-    "ParameterValue": "false"
+    "ParameterValue": "true"
   },
   {
     "ParameterKey": "SpotInstanceMaxPrice",

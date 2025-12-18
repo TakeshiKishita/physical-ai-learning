@@ -58,7 +58,7 @@ Isaac Sim環境を構築するためのAWSサービスの比較です。
 ```typescript
 const vpc = new ec2.Vpc(this, 'VPC');
 const instance = new ec2.Instance(this, 'Instance', {
-  instanceType: ec2.InstanceType.of(ec2.InstanceClass.G4DN, ec2.InstanceSize.XLARGE2),
+  instanceType: ec2.InstanceType.of(ec2.InstanceClass.G5, ec2.InstanceSize.XLARGE2),
   machineImage: ec2.MachineImage.lookup({
     name: 'isaac-sim-*'
   })
@@ -94,7 +94,7 @@ aws ec2 create-launch-template \
   --launch-template-name isaac-sim-template \
   --launch-template-data '{
     "ImageId": "ami-0123456789abcdef0",
-    "InstanceType": "g4dn.2xlarge",
+    "InstanceType": "g5.2xlarge",
     "KeyName": "my-keypair"
   }'
 ```

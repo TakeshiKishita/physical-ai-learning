@@ -37,20 +37,21 @@ Parameters:
     AllowedValues:
       - g4dn.2xlarge
       - g4dn.4xlarge
-      - g5.xlarge
       - g5.2xlarge
+      - g5.4xlarge
+      - g5.8xlarge
       - g6e.xlarge
       - g6e.2xlarge
     Description: |
       EC2 instance type for Isaac Sim.
-      - g4dn.2xlarge: Minimum required for Isaac Sim AMI (T4 GPU, 32GB RAM)
-      - g6e.xlarge: Latest generation with L40S GPU (2x performance, higher cost)
-      - Note: g4dn.xlarge is NOT supported by the AMI.
+      - g4dn.2xlarge: Cost-effective choice (T4 GPU, 32GB RAM). Supported by Deep Learning AMI.
+      - g5.2xlarge: Higher performance (A10G GPU).
+      - Note: When using the Deep Learning AMI, g4dn is fully supported.
   
   AMIId:
     Type: String
-    Description: AMI ID for Isaac Sim (region-specific)
-    Default: ami-XXXXX
+    Description: AMI ID for Deep Learning OSS Nvidia Driver AMI (Ubuntu 22.04)
+    Default: ami-089e22c42ee7843a2
   
   KeyPairName:
     Type: AWS::EC2::KeyPair::KeyName
@@ -204,70 +205,83 @@ Resources:
       Roles:
         - !Ref IsaacSimInstanceRole
   
+  # EC2 Launch Template
+  IsaacSimLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub '${AWS::StackName}-launch-template'
+      LaunchTemplateData:
+        ImageId: !Ref AMIId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyPairName
+        SecurityGroupIds:
+          - !GetAtt IsaacSimSecurityGroup.GroupId
+        IamInstanceProfile:
+          Arn: !GetAtt IsaacSimInstanceProfile.Arn
+        InstanceMarketOptions: !If
+          - UseSpotInstance
+          - MarketType: spot
+            SpotOptions:
+              MaxPrice: !If [HasSpotPrice, !Ref SpotInstanceMaxPrice, !Ref AWS::NoValue]
+              SpotInstanceType: one-time
+          - !Ref AWS::NoValue
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeSize: !Ref VolumeSize
+              VolumeType: gp3
+              Iops: 3000
+              Encrypted: true
+              DeleteOnTermination: true
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            echo "Starting user data script..."
+            
+            # Check NVIDIA Driver
+            if command -v nvidia-smi &> /dev/null; then
+              echo "NVIDIA Driver found:"
+              nvidia-smi
+              nvidia-smi > /var/log/nvidia-smi-boot.log
+            else
+              echo "NVIDIA Driver NOT found!"
+            fi
+            
+            # Install basic tools if needed
+            apt-get update && apt-get install -y htop tmux jq
+            
+            echo "User data script completed."
+        Monitoring:
+          Enabled: true
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${AWS::StackName}-instance'
+              - Key: Project
+                Value: physical-ai-learning
+              - Key: Week
+                Value: week1
+              - Key: ManagedBy
+                Value: CloudFormation
+              - Key: CreatedBy
+                Value: !Sub '${AWS::StackName}'
+              - Key: AutoShutdown
+                Value: !Ref AutoShutdownEnabled
+              - Key: SpotInstance
+                Value: !Ref UseSpotInstance
+
   # EC2 Instance
   IsaacSimInstance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Ref AMIId
-      InstanceType: !Ref InstanceType
-      KeyName: !Ref KeyPairName
-      SecurityGroupIds:
-        - !Ref IsaacSimSecurityGroup
-      IamInstanceProfile: !Ref IsaacSimInstanceProfile
-      InstanceMarketOptions: !If
-        - UseSpotInstance
-        - MarketType: spot
-          SpotOptions:
-            MaxPrice: !If [HasSpotPrice, !Ref SpotInstanceMaxPrice, !Ref AWS::NoValue]
-            SpotInstanceType: one-time
-        - !Ref AWS::NoValue
-      BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-            VolumeSize: !Ref VolumeSize
-            VolumeType: gp3
-            Iops: 3000
-            Encrypted: true
-            DeleteOnTermination: true
-      # UserData to log startup and check GPU
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          echo "Starting user data script..."
-          
-          # Check NVIDIA Driver
-          if command -v nvidia-smi &> /dev/null; then
-            echo "NVIDIA Driver found:"
-            nvidia-smi
-            nvidia-smi > /var/log/nvidia-smi-boot.log
-          else
-            echo "NVIDIA Driver NOT found!"
-          fi
-          
-          # Install basic tools if needed
-          apt-get update && apt-get install -y htop tmux jq
-          
-          echo "User data script completed."
-      Monitoring: true
-      MetadataOptions:
-        HttpEndpoint: enabled
-        HttpTokens: required
-        HttpPutResponseHopLimit: 1
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-instance'
-        - Key: Project
-          Value: physical-ai-learning
-        - Key: Week
-          Value: week1
-        - Key: ManagedBy
-          Value: CloudFormation
-        - Key: CreatedBy
-          Value: !Sub '${AWS::StackName}'
-        - Key: AutoShutdown
-          Value: !Ref AutoShutdownEnabled
-        - Key: SpotInstance
-          Value: !Ref UseSpotInstance
+      LaunchTemplate:
+        LaunchTemplateId: !Ref IsaacSimLaunchTemplate
+        Version: !GetAtt IsaacSimLaunchTemplate.LatestVersionNumber
   
   # CloudWatch Alarm for Auto Shutdown (cost optimization)
   AutoShutdownAlarm:

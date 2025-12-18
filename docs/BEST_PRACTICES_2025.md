@@ -4,7 +4,23 @@ NVIDIAとAWSの最新ベストプラクティスに基づいた、Isaac Sim環�
 
 ## 最新の推奨事項（2025年）
 
-### 1. インスタンスタイプの選択
+## 0. 事前準備：AWS クォータ（制限）の確認と緩和【重要】
+
+**このテンプレートを実行する前に、必ず以下の「サービス制限緩和申請」が必要です。**
+新規のAWSアカウントでは、GPUインスタンス（Gシリーズ）の使用枠（vCPU）が「0」に設定されていることが多く、そのままではエラー（`CREATE_FAILED`）になります。
+
+### 申請手順
+
+1. AWSコンソールの **[Service Quotas](https://console.aws.amazon.com/servicequotas/home/services/ec2/quotas)** ページを開く。
+2. 以下の項目を検索し、クォータ引き上げリクエストを行います。
+   - **オンデマンド利用の場合**: `Running On-Demand G and VT instances`
+   - **スポット利用の場合**: `All G and VT Spot Instance Requests`
+3. **申請値**: `8` 以上 (g4dn.2xlarge は 8 vCPU 必要)
+4. 承認されるまで待機（数分〜数時間）。
+
+---
+
+## 1. インスタンスタイプの選択（詳細）
 
 #### NVIDIA推奨: G6eインスタンス（L40S GPU）
 
@@ -16,16 +32,64 @@ NVIDIAとAWSの最新ベストプラクティスに基づいた、Isaac Sim環�
 
 **個人学習用推奨**:
 
-- **g4dn.2xlarge**: T4 GPU搭載, 32GB RAM
-- **コスト**: それでも学習用としては最適
-- **用途**: 学習・開発環境
+- **g4dn.2xlarge**: T4 GPU搭載, 32GB RAM（Deep Learning AMI使用時）
+- **性能**: 基本的な学習には十分
+- **用途**: 個人学習・開発環境（推奨）
+
+**※AMIに関する重要事項**:
+現在のIsaac Sim公式AMIはg4dnをサポートしていないため、**Deep Learning OSS Nvidia Driver AMI**を使用し、Isaac Simを手動インストールする構成を推奨します。
+
+### 1.1 Isaac Sim インストール手順 (Deep Learning AMI 利用時)
+
+Deep Learning AMI には Isaac Sim が含まれていないため、インスタンス起動後に以下のいずれかの方法でインストールが必要です。
+
+#### A. Container Installation (推奨: 軽量・高速)
+
+Docker コンテナとして実行する方法です。学習用途に最適です。
+
+1. **NVIDIA Container Toolkit の確認**:
+
+   ```bash
+   nvidia-smi
+   # Deep Learning AMI にはドライバとToolkitが含まれています
+   ```
+
+2. **NGC カタログから Pull**:
+
+   ```bash
+   # NGC API Key が必要です (NVIDIA NGCで無料取得可能)
+   docker login nvcr.io
+   docker pull nvcr.io/nvidia/isaac-sim:2023.1.1 # バージョンは最新を確認
+   ```
+
+3. **実行**:
+
+   ```bash
+   docker run --name isaac-sim --entrypoint ./runheadless.native.sh --gpus all -e "ACCEPT_EULA=Y" --rm -v /home/ubuntu/isaac-sim/cache/ov:/root/.cache/ov:rw -v /home/ubuntu/isaac-sim/cache/pip:/root/.cache/pip:rw -v /home/ubuntu/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw -v /home/ubuntu/isaac-sim/config:/root/.nvidia-omniverse/config:rw -v /home/ubuntu/isaac-sim/data:/root/.local/share/ov/data:rw -v /home/ubuntu/isaac-sim/documents:/root/Documents:rw -p 4700-4900:4700-4900/tcp -p 4700-4900:4700-4900/udp nvcr.io/nvidia/isaac-sim:2023.1.1
+   ```
+
+   > 詳細は [Isaac Sim Container Installation Guide](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/install_container.html) を参照。
+
+#### B. Omniverse Launcher Installation (GUI必要)
+
+VNC 等でデスクトップ接続し、GUI ランチャーからインストールする方法です。
+
+1. **Omniverse Launcher のダウンロード**:
+   公式サイトから Linux 版をダウンロード。
+2. **インストールとログイン**:
+   ランチャーを起動し、NVIDIA アカウントでログイン。
+3. **Isaac Sim のインストール**:
+   "Exchange" タブから Isaac Sim を検索してインストール。
+
+---
 
 #### インスタンス比較
 
-| タイプ | GPU | 性能 | コスト/時間 | 推奨用途 |
+| タイプ | GPU | VRAM | コスト/時間 | 推奨用途 |
 |--------|-----|------|------------|---------|
-| g4dn.2xlarge | T4 | 標準 | ~$1.05 | ⭐ 個人学習 |
-| g6e.xlarge | L40S | 2倍 | ~$1.20+ | 本番・高性能 |
+| g4dn.2xlarge | T4 | 16GB | ~$0.71 | ⭐ 個人学習（DL AMI） |
+| g5.2xlarge | A10G | 24GB | ~$1.21 | 性能重視 |
+| g6e.xlarge | L40S | 48GB | ~$1.60+ | 本番環境 |
 
 ### 2. Isaac Simの最適化
 
@@ -64,7 +128,7 @@ NVIDIAフォーラムで推奨されている最適化:
 
 1. **スポットインスタンス**: 最大90%削減
 2. **自動停止**: 使用していない時は停止
-3. **適切なインスタンスサイズ**: g4dn.2xlarge (AMI最小要件)
+3. **適切なインスタンスサイズ**: g4dn.2xlarge (DL AMI使用)
 
 #### 推奨設定
 
