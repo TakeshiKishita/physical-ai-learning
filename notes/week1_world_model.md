@@ -12,7 +12,7 @@
 ## 前提条件
 
 - AWS アカウント & AWS CLI 設定済み
-- GPU付きインスタンス（例: `g4dn.xlarge`）を利用可能
+- GPU付きインスタンス（例: `g4dn.2xlarge` 以上）を利用可能
 - NVIDIA Isaac Sim / Omniverse 用 AMI を把握している
 - CloudFormation テンプレート・パラメータファイルが準備済み
 
@@ -32,7 +32,7 @@
 [
   {
     "ParameterKey": "InstanceType",
-    "ParameterValue": "g4dn.xlarge"
+    "ParameterValue": "g4dn.2xlarge"
   },
   {
     "ParameterKey": "AMIId",

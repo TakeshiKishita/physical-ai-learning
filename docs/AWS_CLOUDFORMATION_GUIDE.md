@@ -140,12 +140,23 @@ echo "CIDR format: $MY_IP/32"
 
 **注意**: 自宅やオフィスから接続する場合、IPアドレスが変わる可能性があります。その場合は`0.0.0.0/0`（すべてのIPを許可）を使用できますが、セキュリティリスクが高くなります。
 
+#### 1-5. Omniverse Streaming Clientの準備
+
+Isaac Simをリモートで快適に操作するために、**Omniverse Streaming Client** の使用を推奨します。テンプレートでは以下のポートが開放されます：
+
+- **TCP 8899**: Omniverse Kit Remote (HTTP/WebSocket)
+- **TCP/UDP 49000-49100**: WebRTC Media Streaming
+- **TCP 5900-5910**: VNC (予備手段として維持)
+
+これにより、ブラウザベースのWebRTCストリーミングや、ネイティブクライアントによる低遅延な操作が可能になります。
+
 #### 1-4. インスタンスタイプの選択
 
 テンプレートで利用可能なインスタンスタイプ：
 
-- `g4dn.xlarge`: コスト効率が良い、旧世代（T4 GPU）- **学習用途に推奨**
-- `g4dn.2xlarge`: g4dn.xlargeの2倍の性能
+- `g4dn.2xlarge`: **最小推奨要件** (T4 GPU, 32GB RAM)。学習用途に推奨。
+  - **注意**: `g4dn.xlarge` (16GB RAM) は AMI のサポート対象外です。
+- `g4dn.4xlarge`: g4dn.2xlargeの2倍の性能
 - `g5.xlarge`: 新世代（A10G GPU）
 - `g6e.xlarge`: 最新世代（L40S GPU、2倍の性能、高コスト）
 - `g6e.2xlarge`: g6e.xlargeの2倍の性能
@@ -158,7 +169,7 @@ echo "CIDR format: $MY_IP/32"
 
 | パラメータ | 説明 | 取得方法 | デフォルト値 |
 |-----------|------|---------|------------|
-| `InstanceType` | EC2インスタンスタイプ | 上記1-4を参照 | `g4dn.xlarge` |
+| `InstanceType` | EC2インスタンスタイプ | 上記1-4を参照 | `g4dn.2xlarge` |
 | `AMIId` | Isaac Sim用AMI ID | 上記1-2を参照 | `ami-XXXXX`（要変更） |
 | `KeyPairName` | EC2キーペア名 | 上記1-1を参照 | 要設定 |
 | `AllowedSSHCIDR` | SSH接続許可CIDR | 上記1-3を参照 | `0.0.0.0/0`（全許可） |
@@ -175,7 +186,7 @@ echo "CIDR format: $MY_IP/32"
 1. [EC2コンソール](https://ap-northeast-1.console.aws.amazon.com/ec2/)にアクセス
 2. 左メニューから「スポットリクエスト」→「リクエスト」を選択
 3. 「スポットインスタンスをリクエスト」をクリック
-4. インスタンスタイプ（例: `g4dn.xlarge`）を選択
+4. インスタンスタイプ（例: `g4dn.2xlarge`）を選択
 5. 「価格履歴」タブで現在のスポット価格を確認
 6. オンデマンド価格も表示されるので、それを参考に設定
 
@@ -191,7 +202,7 @@ echo "CIDR format: $MY_IP/32"
 [
   {
     "ParameterKey": "InstanceType",
-    "ParameterValue": "g4dn.xlarge"
+    "ParameterValue": "g4dn.2xlarge"
   },
   {
     "ParameterKey": "AMIId",
@@ -226,7 +237,10 @@ echo "CIDR format: $MY_IP/32"
     "ParameterValue": "true"
   }
 ]
+
 ```
+
+**※注記**: `AllowedVNCCIDR` パラメータは、VNCポートだけでなく、Omniverse Streaming Client用のWebRTCポート（TCP/UDP 49000-49100, TCP 8899）の許可IP範囲としても使用されます。
 
 ### ステップ3: スタックのデプロイ
 
@@ -313,7 +327,11 @@ aws cloudformation delete-change-set \
   --change-set-name $CHANGE_SET_NAME
 
 echo ""
-echo "✅ dry run検証が完了しました。問題がなければ、次にデプロイを実行してください。"
+echo "✅ dry run検証が完了しました。"
+echo "⚠️ 新規作成(CREATE)のdry runの場合、スタックが 'REVIEW_IN_PROGRESS' 状態で残ります。"
+echo "   本番デプロイの前に必ず以下のコマンドでスタックを削除してください:"
+echo "   aws cloudformation delete-stack --stack-name isaac-sim-stack"
+
 ```
 
 **既存スタックの更新の場合：**
@@ -340,7 +358,22 @@ aws cloudformation delete-change-set \
   --change-set-name $CHANGE_SET_NAME
 ```
 
-**デプロイの実行**
+#### デプロイの実行
+
+**⚠️ 重要: 事前のクリーンアップ**
+
+新規作成の dry run を行った場合や、以前のデプロイが中断した場合、スタックが `REVIEW_IN_PROGRESS` や `ROLLBACK_COMPLETE` の状態で残っていることがあります。
+この状態では新規デプロイ（作成）が失敗するため、**必ずスタックを削除してから**実行してください。
+
+```bash
+# 残留しているスタックを削除
+aws cloudformation delete-stack --stack-name isaac-sim-stack
+
+# 削除完了を確認（エラーが出れば削除済み）
+aws cloudformation describe-stacks --stack-name isaac-sim-stack
+```
+
+**デプロイコマンドの実行**
 
 ```bash
 ./scripts/cloudformation_deploy.sh
@@ -404,17 +437,18 @@ aws cloudformation delete-stack \
 - **IsaacSimInstanceRole**: IAMロール（Systems Manager用）
 - **IsaacSimInstanceProfile**: IAMインスタンスプロファイル
 - **IsaacSimInstance**: EC2インスタンス
+  - **UserData**: 起動時にNVIDIAドライバの状態確認と基本ツールのインストールを実行
 
 ### パラメータ
 
-- `InstanceType`: インスタンスタイプ（g4dn.xlarge等）
+- `InstanceType`: インスタンスタイプ（g4dn.2xlarge等）
 - `AMIId`: Isaac Sim用AMI ID（リージョン固有）
 - `KeyPairName`: キーペア名（既存のキーペアが必要）
 - `AllowedSSHCIDR`: SSH接続許可CIDR（推奨: 自分のIP/32）
-- `AllowedVNCCIDR`: VNC接続許可CIDR（推奨: 自分のIP/32）
-- `VolumeSize`: EBSボリュームサイズ（GB、128-1000の範囲、最小128GB必須）
+- `AllowedVNCCIDR`: リモートアクセス用CIDR。VNC(5900-5910)に加え、Omniverse Streaming(8899, 49000-49100)もこのCIDRで制御されます。
+- `VolumeSize`: EBSボリュームサイズ（GB、128-1000の範囲、最小128GB必須）。**gp3** タイプを使用します。
 - `UseSpotInstance`: スポットインスタンス使用（`true`/`false`）
-- `SpotInstanceMaxPrice`: スポットインスタンス最大価格（USD/時）。空文字列（`""`）にすると、オンデマンド価格が自動的に使用されます
+- `SpotInstanceMaxPrice`: スポットインスタンス最大価格（USD/時）。空文字列でオンデマンド価格。正しく設定することで `SpotOptions` に反映されます。
 - `AutoShutdownEnabled`: 自動シャットダウン有効化（`true`/`false`）
 
 ### 出力
