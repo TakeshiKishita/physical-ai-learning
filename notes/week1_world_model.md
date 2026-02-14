@@ -12,8 +12,9 @@
 ## 前提条件
 
 - AWS アカウント & AWS CLI 設定済み
-- GPU付きインスタンス（例: `g4dn.2xlarge` 以上）を利用可能
-- NVIDIA Isaac Sim / Omniverse 用 AMI を把握している
+- GPU付きインスタンス（最小: `g4dn.2xlarge`、32GB RAM）を利用可能
+- Deep Learning OSS Nvidia Driver AMI（Ubuntu 22.04）を使用
+- Isaac Sim は Docker コンテナとしてインストール（[手順](../docs/BEST_PRACTICES.md)）
 - CloudFormation テンプレート・パラメータファイルが準備済み
 
 ---
@@ -26,7 +27,7 @@
 
 #### 1. パラメータファイルの確認・編集
 
-`cloudformation/parameters.json` を編集：
+`cloudformation/parameters.json` を確認・編集：
 
 ```json
 [
@@ -36,19 +37,19 @@
   },
   {
     "ParameterKey": "AMIId",
-    "ParameterValue": "ami-083436b6b99e9e44e"  // 東京リージョンのIsaac Sim AMI
+    "ParameterValue": "ami-089e22c42ee7843a2"
   },
   {
     "ParameterKey": "KeyPairName",
-    "ParameterValue": "isaac-sim-keypair"  // 既存のキーペア名
+    "ParameterValue": "isaac-sim-keypair"
   },
   {
     "ParameterKey": "AllowedSSHCIDR",
-    "ParameterValue": "0.0.0.0/0"  // セキュリティのため自分のIP/32推奨
+    "ParameterValue": "0.0.0.0/0"
   },
   {
     "ParameterKey": "AllowedVNCCIDR",
-    "ParameterValue": "0.0.0.0/0"  // セキュリティのため自分のIP/32推奨
+    "ParameterValue": "0.0.0.0/0"
   },
   {
     "ParameterKey": "VolumeSize",
@@ -56,18 +57,23 @@
   },
   {
     "ParameterKey": "UseSpotInstance",
-    "ParameterValue": "false"  // 初回は安定性のためオンデマンド推奨
+    "ParameterValue": "false"
   },
   {
     "ParameterKey": "SpotInstanceMaxPrice",
-    "ParameterValue": "0.10"
+    "ParameterValue": ""
   },
   {
     "ParameterKey": "AutoShutdownEnabled",
-    "ParameterValue": "true"  // コスト削減のため有効化推奨
+    "ParameterValue": "true"
   }
 ]
 ```
+
+> **Note**:
+> - `AMIId`: Deep Learning OSS Nvidia Driver AMI（東京リージョン）。最新の AMI ID は AWS Marketplace で確認してください。
+> - `AllowedSSHCIDR` / `AllowedVNCCIDR`: セキュリティのため自分のIP/32を推奨。
+> - `UseSpotInstance`: 初回は安定性のためオンデマンド（`false`）推奨。
 
 #### 2. CloudFormation スタックのデプロイ
 
@@ -105,50 +111,57 @@ echo "" >> logs/week1_env_checklist.md
 
 ---
 
-### Task 1-2：Isaac Sim GUI の起動とシンプルな物理シミュレーション
+### Task 1-2：Isaac Sim の起動とシンプルな物理シミュレーション
 
-**ゴール:** Isaac Sim の GUI を開き、Box が落下するシンプルなシミュレーションを実行する。
+**ゴール:** Isaac Sim を起動し、Box が落下するシンプルなシミュレーションを実行する。
 
-#### 1. EC2 インスタンスにリモート接続
-
-##### 方法A: SSH + VNC（推奨）
+#### 1. EC2 インスタンスに接続
 
 ```bash
 # SSH接続
 ssh -i ~/.ssh/isaac-sim-keypair.pem ubuntu@<PUBLIC_IP>
-
-# VNCサーバーの起動（インスタンス内で実行）
-vncserver :1 -geometry 1920x1080 -depth 24
 ```
 
-ローカルPCから VNC クライアント（TigerVNC, RealVNC等）で接続：
-
-- アドレス: `<PUBLIC_IP>:5901`
-
-##### 方法B: AWS Systems Manager Session Manager
+#### 2. Isaac Sim コンテナを起動
 
 ```bash
-# SSH鍵不要でブラウザから接続
-aws ssm start-session --target <INSTANCE_ID>
+# NGC にログイン（初回のみ）
+docker login nvcr.io
+
+# Isaac Sim コンテナを pull & 起動
+docker pull nvcr.io/nvidia/isaac-sim:4.5.0
+docker run --name isaac-sim \
+  --entrypoint ./runheadless.native.sh \
+  --gpus all \
+  -e "ACCEPT_EULA=Y" \
+  --rm \
+  -v /home/ubuntu/isaac-sim/cache/ov:/root/.cache/ov:rw \
+  -v /home/ubuntu/isaac-sim/cache/pip:/root/.cache/pip:rw \
+  -v /home/ubuntu/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+  -v /home/ubuntu/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
+  -v /home/ubuntu/isaac-sim/data:/root/.local/share/ov/data:rw \
+  -v /home/ubuntu/isaac-sim/documents:/root/Documents:rw \
+  -p 8899:8899/tcp \
+  -p 49000-49100:49000-49100/tcp \
+  -p 49000-49100:49000-49100/udp \
+  nvcr.io/nvidia/isaac-sim:4.5.0
 ```
 
-#### 2. Isaac Sim を起動
+> **Note**: バージョンは [NGC Isaac Sim カタログ](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/isaac-sim) で最新版を確認してください。
+> 初回起動は数分かかる場合があります。
 
-```bash
-cd ~/isaac-sim
-./isaac-sim.sh &
-```
+#### 3. Omniverse Streaming Client で接続
 
-> **Note**: 初回起動は数分かかる場合があります。
+ローカルPCから Omniverse Streaming Client で `<PUBLIC_IP>:8899` に接続してGUIを操作します。
 
-#### 3. GUI操作
+#### 4. GUI操作
 
 1. `File > New` で新規シーン作成
 2. `Create > Physics` から **Ground Plane** を追加
 3. `Create > Mesh > Cube` で **Box** を追加（床の上・少し上に配置）
-4. **Play** ボタン（▶）を押し、Box が重力で落下・床と衝突する様子を確認
+4. **Play** ボタンを押し、Box が重力で落下・床と衝突する様子を確認
 
-#### 4. 観察内容を記録
+#### 5. 観察内容を記録
 
 ```markdown
 ## 物理シミュレーション観察メモ
@@ -213,8 +226,6 @@ cd ~/isaac-sim
 
 # 停止（EBS料金のみ発生、EC2料金は0円）
 aws ec2 stop-instances --instance-ids <INSTANCE_ID>
-
-echo "Stopped instance: <INSTANCE_ID>" >> logs/week1_env_checklist.md
 ```
 
 #### オプション2: スタック完全削除（完全にクリーンアップ）
@@ -222,8 +233,6 @@ echo "Stopped instance: <INSTANCE_ID>" >> logs/week1_env_checklist.md
 ```bash
 # すべてのリソースを削除
 ./scripts/cloudformation_destroy.sh
-
-echo "Terminated CloudFormation stack" >> logs/week1_env_checklist.md
 ```
 
 > **Note**:
@@ -250,6 +259,12 @@ echo "Terminated CloudFormation stack" >> logs/week1_env_checklist.md
 
 ## トラブルシューティング
 
+### Streaming Client で接続できない
+
+1. セキュリティグループでポート8899、49000-49100が開いているか確認
+2. `parameters.json` の `AllowedVNCCIDR` を確認（Streaming用ポートもこのCIDRで制御）
+3. Isaac Sim コンテナが正常に起動しているか確認: `docker logs isaac-sim`
+
 ### VNC接続ができない
 
 1. セキュリティグループでポート5900-5910が開いているか確認
@@ -259,8 +274,8 @@ echo "Terminated CloudFormation stack" >> logs/week1_env_checklist.md
 ### Isaac Sim が起動しない
 
 1. GPU ドライバーを確認: `nvidia-smi`
-2. Isaac Sim のログを確認: `~/isaac-sim/logs/`
-3. AMI が正しいか確認（Isaac Sim プリインストール版）
+2. Docker コンテナのログを確認: `docker logs isaac-sim`
+3. NVIDIA Container Toolkit がインストールされているか確認
 
 ### 自動停止されてしまった
 
@@ -271,6 +286,7 @@ echo "Terminated CloudFormation stack" >> logs/week1_env_checklist.md
 
 ## 参考リソース
 
+- [環境構築ベストプラクティス](../docs/BEST_PRACTICES.md)
 - [CloudFormation テンプレートリファレンス](../docs/CLOUDFORMATION_TEMPLATE_REFERENCE.md)
 - [AWS CloudFormation ガイド](../docs/AWS_CLOUDFORMATION_GUIDE.md)
 - [コスト最適化ガイド](../docs/COST_OPTIMIZATION_GUIDE.md)
