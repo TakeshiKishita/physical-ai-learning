@@ -65,21 +65,25 @@ Docker コンテナとして実行する方法です。学習用途に最適で�
 
    ```bash
    docker run --name isaac-sim \
-     --entrypoint ./runheadless.native.sh \
+     --entrypoint bash \
      --gpus all \
      -e "ACCEPT_EULA=Y" \
-     --rm \
-     -v /home/ubuntu/isaac-sim/cache/ov:/root/.cache/ov:rw \
-     -v /home/ubuntu/isaac-sim/cache/pip:/root/.cache/pip:rw \
-     -v /home/ubuntu/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
-     -v /home/ubuntu/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
-     -v /home/ubuntu/isaac-sim/data:/root/.local/share/ov/data:rw \
-     -v /home/ubuntu/isaac-sim/documents:/root/Documents:rw \
-     -p 8899:8899/tcp \
-     -p 49000-49100:49000-49100/tcp \
-     -p 49000-49100:49000-49100/udp \
-     nvcr.io/nvidia/isaac-sim:4.5.0
+     -e "PRIVACY_CONSENT=Y" \
+     --rm --network=host \
+     -v ~/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
+     -v ~/isaac-sim/cache/ov:/root/.cache/ov:rw \
+     -v ~/isaac-sim/cache/pip:/root/.cache/pip:rw \
+     -v ~/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw \
+     -v ~/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw \
+     -v ~/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+     -v ~/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
+     -v ~/isaac-sim/data:/root/.local/share/ov/data:rw \
+     -v ~/isaac-sim/documents:/root/Documents:rw \
+     nvcr.io/nvidia/isaac-sim:4.5.0 \
+     -c "./runheadless.sh"
    ```
+
+   起動後、ブラウザで `http://<IP>:8211/streaming/webrtc-client?server=<IP>` にアクセスして GUI を操作できます。
 
    > 詳細は [Isaac Sim Container Installation Guide](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html) を参照。
 

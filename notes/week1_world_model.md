@@ -12,10 +12,15 @@
 ## 前提条件
 
 - AWS アカウント & AWS CLI 設定済み
-- GPU付きインスタンス（最小: `g4dn.2xlarge`、32GB RAM）を利用可能
+- GPU付きインスタンス（最小: `g4dn.2xlarge`、T4 GPU / 32GB RAM）を利用可能
 - Deep Learning OSS Nvidia Driver AMI（Ubuntu 22.04）を使用
 - Isaac Sim は Docker コンテナとしてインストール（[手順](../docs/BEST_PRACTICES.md)）
 - CloudFormation テンプレート・パラメータファイルが準備済み
+
+> **Note（GPU要件について）**: Isaac Sim の公式最小要件は RTX 3070（8GB VRAM）です。
+> T4（g4dn）は公式最小要件を下回りますが、ヘッドレスモードでの基本的な物理シミュレーションや
+> RL学習には利用実績があります。レンダリング品質やストリーミング性能には制限が生じる場合があります。
+> より安定した環境が必要な場合は `g5.2xlarge`（A10G GPU）の利用を検討してください。
 
 ---
 
@@ -126,39 +131,50 @@ ssh -i ~/.ssh/isaac-sim-keypair.pem ubuntu@<PUBLIC_IP>
 
 ```bash
 # NGC にログイン（初回のみ）
+# ユーザー名: $oauthtoken / パスワード: NGC API Key
 docker login nvcr.io
 
 # Isaac Sim コンテナを pull & 起動
 docker pull nvcr.io/nvidia/isaac-sim:4.5.0
 docker run --name isaac-sim \
-  --entrypoint ./runheadless.native.sh \
+  --entrypoint bash \
   --gpus all \
   -e "ACCEPT_EULA=Y" \
-  --rm \
-  -v /home/ubuntu/isaac-sim/cache/ov:/root/.cache/ov:rw \
-  -v /home/ubuntu/isaac-sim/cache/pip:/root/.cache/pip:rw \
-  -v /home/ubuntu/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
-  -v /home/ubuntu/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
-  -v /home/ubuntu/isaac-sim/data:/root/.local/share/ov/data:rw \
-  -v /home/ubuntu/isaac-sim/documents:/root/Documents:rw \
-  -p 8899:8899/tcp \
-  -p 49000-49100:49000-49100/tcp \
-  -p 49000-49100:49000-49100/udp \
-  nvcr.io/nvidia/isaac-sim:4.5.0
+  -e "PRIVACY_CONSENT=Y" \
+  --rm --network=host \
+  -v ~/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
+  -v ~/isaac-sim/cache/ov:/root/.cache/ov:rw \
+  -v ~/isaac-sim/cache/pip:/root/.cache/pip:rw \
+  -v ~/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw \
+  -v ~/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw \
+  -v ~/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+  -v ~/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
+  -v ~/isaac-sim/data:/root/.local/share/ov/data:rw \
+  -v ~/isaac-sim/documents:/root/Documents:rw \
+  nvcr.io/nvidia/isaac-sim:4.5.0 \
+  -c "./runheadless.sh"
 ```
 
-> **Note**: バージョンは [NGC Isaac Sim カタログ](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/isaac-sim) で最新版を確認してください。
-> 初回起動は数分かかる場合があります。
+> **Note**:
+> - バージョンは [NGC Isaac Sim カタログ](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/isaac-sim) で最新版を確認してください。
+> - 初回起動はシェーダーコンパイル等で数分〜十数分かかる場合があります。
+> - `--network=host` を使用するため、ポートマッピングは不要です。セキュリティグループ側でポート制御を行います。
 
-#### 3. Omniverse Streaming Client で接続
+#### 3. ブラウザから WebRTC Streaming で接続
 
-ローカルPCから Omniverse Streaming Client で `<PUBLIC_IP>:8899` に接続してGUIを操作します。
+Isaac Sim 4.5.0 以降では、ブラウザベースの WebRTC ストリーミングで GUI を操作できます。
+
+```
+http://<PUBLIC_IP>:8211/streaming/webrtc-client?server=<PUBLIC_IP>
+```
+
+> **Note**: セキュリティグループでポート 8211 が許可されている必要があります。
 
 #### 4. GUI操作
 
 1. `File > New` で新規シーン作成
 2. `Create > Physics` から **Ground Plane** を追加
-3. `Create > Mesh > Cube` で **Box** を追加（床の上・少し上に配置）
+3. `Create > Shape > Cube` で **Box** を追加（床の上・少し上に配置）
 4. **Play** ボタンを押し、Box が重力で落下・床と衝突する様子を確認
 
 #### 5. 観察内容を記録
@@ -182,10 +198,10 @@ docker run --name isaac-sim \
 
 #### 1. Isaac Sim GUI 上で以下を配置
 
-- **Ground Plane**: 床
-- **Table**: 机（`Create > Mesh > Cube` をスケールして机に見立てる、または既存アセット）
-- **Box**: 机の上に配置
-- **Robot Arm**: 例: Franka Emika（`Isaac Examples > Franka` から追加）
+- **Ground Plane**: 床（`Create > Physics > Ground Plane`）
+- **Table**: 机（`Create > Shape > Cube` をスケールして机に見立てる、または既存アセット）
+- **Box**: 机の上に配置（`Create > Shape > Cube`）
+- **Robot Arm**: 例: Franka Emika（`Create > Robots > Franka Emika Panda Arm`）
 - **Camera**: 机とロボットを俯瞰できる位置に配置
 
 #### 2. カメラビュー調整
@@ -196,7 +212,7 @@ docker run --name isaac-sim \
 
 - `File > Save As`
 - ファイル名: `week1_minimal_world.usd`
-- 保存先: `~/isaac-sim/scenes/` など
+- 保存先: `~/isaac-sim/documents/` など（コンテナのボリュームマウント先）
 
 #### 4. シーン構成メモ
 
@@ -259,11 +275,12 @@ aws ec2 stop-instances --instance-ids <INSTANCE_ID>
 
 ## トラブルシューティング
 
-### Streaming Client で接続できない
+### WebRTC Streaming で接続できない
 
-1. セキュリティグループでポート8899、49000-49100が開いているか確認
+1. セキュリティグループでポート 8211 が開いているか確認
 2. `parameters.json` の `AllowedVNCCIDR` を確認（Streaming用ポートもこのCIDRで制御）
 3. Isaac Sim コンテナが正常に起動しているか確認: `docker logs isaac-sim`
+4. ブラウザの URL が正しいか確認: `http://<IP>:8211/streaming/webrtc-client?server=<IP>`
 
 ### VNC接続ができない
 
@@ -275,7 +292,8 @@ aws ec2 stop-instances --instance-ids <INSTANCE_ID>
 
 1. GPU ドライバーを確認: `nvidia-smi`
 2. Docker コンテナのログを確認: `docker logs isaac-sim`
-3. NVIDIA Container Toolkit がインストールされているか確認
+3. NVIDIA Container Toolkit がインストールされているか確認: `docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi`
+4. T4 GPU の場合、レンダリング負荷が高いシーンで問題が起きやすい。ヘッドレスモードを試す。
 
 ### 自動停止されてしまった
 
@@ -286,6 +304,8 @@ aws ec2 stop-instances --instance-ids <INSTANCE_ID>
 
 ## 参考リソース
 
+- [Isaac Sim Container Installation Guide](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_container.html)
+- [Isaac Sim Requirements](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/requirements.html)
 - [環境構築ベストプラクティス](../docs/BEST_PRACTICES.md)
 - [CloudFormation テンプレートリファレンス](../docs/CLOUDFORMATION_TEMPLATE_REFERENCE.md)
 - [AWS CloudFormation ガイド](../docs/AWS_CLOUDFORMATION_GUIDE.md)

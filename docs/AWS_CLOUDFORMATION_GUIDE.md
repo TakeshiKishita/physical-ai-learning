@@ -140,15 +140,16 @@ echo "CIDR format: $MY_IP/32"
 
 **注意**: 自宅やオフィスから接続する場合、IPアドレスが変わる可能性があります。その場合は`0.0.0.0/0`（すべてのIPを許可）を使用できますが、セキュリティリスクが高くなります。
 
-#### 1-5. Omniverse Streaming Clientの準備
+#### 1-5. Isaac Sim WebRTC Streaming の準備
 
-Isaac Simをリモートで快適に操作するために、**Omniverse Streaming Client** の使用を推奨します。テンプレートでは以下のポートが開放されます：
+Isaac Sim 4.5.0 以降では、ブラウザベースの **WebRTC Streaming** でリモートからGUIを操作できます。テンプレートでは以下のポートが開放されます：
 
-- **TCP 8899**: Omniverse Kit Remote (HTTP/WebSocket)
+- **TCP 8211**: Isaac Sim WebRTC Streaming（メインのストリーミングポート）
+- **TCP 8899**: Omniverse Kit Remote HTTP（レガシー互換）
 - **TCP/UDP 49000-49100**: WebRTC Media Streaming
-- **TCP 5900-5910**: VNC (予備手段として維持)
+- **TCP 5900-5910**: VNC（予備手段として維持）
 
-これにより、ブラウザベースのWebRTCストリーミングや、ネイティブクライアントによる低遅延な操作が可能になります。
+ブラウザから `http://<PUBLIC_IP>:8211/streaming/webrtc-client?server=<PUBLIC_IP>` にアクセスしてGUIを操作します。
 
 #### 1-4. インスタンスタイプの選択
 
@@ -240,7 +241,7 @@ Isaac Simをリモートで快適に操作するために、**Omniverse Streamin
 
 ```
 
-**※注記**: `AllowedVNCCIDR` パラメータは、VNCポートだけでなく、Omniverse Streaming Client用のWebRTCポート（TCP/UDP 49000-49100, TCP 8899）の許可IP範囲としても使用されます。
+**※注記**: `AllowedVNCCIDR` パラメータは、VNCポートだけでなく、Isaac Sim WebRTC Streamingポート（TCP 8211, TCP 8899, TCP/UDP 49000-49100）の許可IP範囲としても使用されます。
 
 ### ステップ3: スタックのデプロイ
 
@@ -445,7 +446,7 @@ aws cloudformation delete-stack \
 - `AMIId`: Isaac Sim用AMI ID（リージョン固有）
 - `KeyPairName`: キーペア名（既存のキーペアが必要）
 - `AllowedSSHCIDR`: SSH接続許可CIDR（推奨: 自分のIP/32）
-- `AllowedVNCCIDR`: リモートアクセス用CIDR。VNC(5900-5910)に加え、Omniverse Streaming(8899, 49000-49100)もこのCIDRで制御されます。
+- `AllowedVNCCIDR`: リモートアクセス用CIDR。VNC(5900-5910)に加え、Isaac Sim WebRTC Streaming(8211, 8899, 49000-49100)もこのCIDRで制御されます。
 - `VolumeSize`: EBSボリュームサイズ（GB、128-1000の範囲、最小128GB必須）。**gp3** タイプを使用します。
 - `UseSpotInstance`: スポットインスタンス使用（`true`/`false`）
 - `SpotInstanceMaxPrice`: スポットインスタンス最大価格（USD/時）。空文字列でオンデマンド価格。正しく設定することで `SpotOptions` に反映されます。
