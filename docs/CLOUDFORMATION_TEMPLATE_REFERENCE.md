@@ -17,10 +17,11 @@ NVIDIA Isaac Sim を実行するための **GPU 搭載 EC2 インスタンス環
 | 1 | IsaacSimSecurityGroup | セキュリティグループ | SSH/VNC アクセス制御 |
 | 2 | IsaacSimInstanceRole | IAM ロール | Systems Manager / CloudWatch 権限 |
 | 3 | IsaacSimInstanceProfile | IAM インスタンスプロファイル | ロールをEC2にアタッチ |
-| 4 | IsaacSimInstance | EC2 インスタンス | Isaac Sim 実行環境（GPU付き） |
-| 5 | AutoShutdownAlarm | CloudWatch アラーム | 自動シャットダウン（条件付き） |
+| 4 | IsaacSimLaunchTemplate | EC2 起動テンプレート | インスタンス設定の定義 |
+| 5 | IsaacSimInstance | EC2 インスタンス | Isaac Sim 実行環境（GPU付き） |
+| 6 | AutoShutdownAlarm | CloudWatch アラーム | 自動シャットダウン（条件付き） |
 
-**合計**: 4リソース（必須）+ 1リソース（オプション）
+**合計**: 5リソース（必須）+ 1リソース（オプション）
 
 ### 主要機能
 
@@ -48,8 +49,8 @@ NVIDIA Isaac Sim を実行するための **GPU 搭載 EC2 インスタンス環
 
 | カテゴリ | パラメータ | デフォルト値 |
 |---------|-----------|-------------|
-| **インスタンス** | InstanceType | `g5.2xlarge` |
-| | AMIId | `ami-XXXXX`（要変更） |
+| **インスタンス** | InstanceType | `g4dn.2xlarge` |
+| | AMIId | `ami-089e22c42ee7843a2`（Deep Learning AMI） |
 | | KeyPairName | （必須入力） |
 | | VolumeSize | `150` GB |
 | **セキュリティ** | AllowedSSHCIDR | `0.0.0.0/0` |
@@ -57,7 +58,6 @@ NVIDIA Isaac Sim を実行するための **GPU 搭載 EC2 インスタンス環
 | **コスト最適化** | UseSpotInstance | `false` |
 | | SpotInstanceMaxPrice | `0.10` |
 | | AutoShutdownEnabled | `true` |
-| | AutoShutdownEnabled | `true` |
 
 ### 🚀 ポストデプロイ設定（Deep Learning AMI 利用時）
 
@@ -66,17 +66,8 @@ NVIDIA Isaac Sim を実行するための **GPU 搭載 EC2 インスタンス環
 1. **インスタンスへの接続**: Output の `SSHCommand` を使用して接続。
 2. **コンテナの実行 (推奨)**:
    Docker コマンドを使用して Isaac Sim コンテナを実行します。
-   > 詳細は `docs/BEST_PRACTICES_2025.md` の「1.1 Isaac Sim インストール手順」を参照してください。
+   > 詳細は `docs/BEST_PRACTICES.md` の「1.1 Isaac Sim インストール手順」を参照してください。
 
-### 🚀 ポストデプロイ設定（Deep Learning AMI 利用時）
-
-現在推奨されている **Deep Learning AMI** には Isaac Sim がプリインストールされていないため、スタック作成後に以下の手順が必要です。
-
-1. **インスタンスへの接続**: Output の `SSHCommand` を使用して接続。
-2. **コンテナの実行 (推奨)**:
-   Docker コマンドを使用して Isaac Sim コンテナを実行します。
-   > 詳細は `docs/BEST_PRACTICES_2025.md` の「1.1 Isaac Sim インストール手順」を参照してください。
->
 ### 推奨デプロイ前変更
 
 > [!WARNING]
@@ -150,8 +141,8 @@ AWS コンソールでパラメータ入力画面のUI配置を定義
 | 項目 | 値 |
 |------|-----|
 | **Type** | `String` |
-| **Default** | `g5.2xlarge` |
-| **AllowedValues** | `g5.2xlarge`, `g5.4xlarge`, `g5.8xlarge`, `g6e.xlarge`, `g6e.2xlarge` |
+| **Default** | `g4dn.2xlarge` |
+| **AllowedValues** | `g4dn.2xlarge`, `g4dn.4xlarge`, `g5.2xlarge`, `g5.4xlarge`, `g5.8xlarge`, `g6e.xlarge`, `g6e.2xlarge` |
 
 **説明:**
 
@@ -171,11 +162,11 @@ EC2 instance type for Isaac Sim.
 | 項目 | 値 |
 |------|-----|
 | **Type** | `String` |
-| **Default** | `ami-XXXXX` |
-| **Description** | `AMI ID for Isaac Sim (region-specific)` |
+| **Default** | `ami-089e22c42ee7843a2` |
+| **Description** | `AMI ID for Deep Learning OSS Nvidia Driver AMI (Ubuntu 22.04)` |
 
 > [!IMPORTANT]
-> リージョンごとに異なるAMI IDを指定する必要があります。
+> Deep Learning OSS Nvidia Driver AMI を使用します。リージョンごとに異なるAMI IDを指定する必要があります。
 
 ---
 
@@ -433,19 +424,21 @@ IAMロールをEC2インスタンスにアタッチするためのラッパー�
 
 ---
 
-### 4. IsaacSimInstance
+### 4. IsaacSimLaunchTemplate
 
-**Type:** `AWS::EC2::Instance`
+**Type:** `AWS::EC2::LaunchTemplate`
 
-#### Properties
+EC2インスタンスの起動設定をテンプレート化するリソースです。インスタンスの詳細設定はすべてこのLaunchTemplate内で定義されます。
+
+#### LaunchTemplateData の主な設定
 
 | プロパティ | 値 |
 |-----------|-----|
 | `ImageId` | `!Ref AMIId` |
 | `InstanceType` | `!Ref InstanceType` |
 | `KeyName` | `!Ref KeyPairName` |
-| `SecurityGroupIds` | `[!Ref IsaacSimSecurityGroup]` |
-| `IamInstanceProfile` | `!Ref IsaacSimInstanceProfile` |
+| `SecurityGroupIds` | `[!GetAtt IsaacSimSecurityGroup.GroupId]` |
+| `IamInstanceProfile` | `{Arn: !GetAtt IsaacSimInstanceProfile.Arn}` |
 
 #### InstanceMarketOptions（条件付き）
 
@@ -453,6 +446,9 @@ IAMロールをEC2インスタンスにアタッチするためのラッパー�
 !If
   - UseSpotInstance
   - MarketType: spot
+    SpotOptions:
+      MaxPrice: !If [HasSpotPrice, !Ref SpotInstanceMaxPrice, !Ref AWS::NoValue]
+      SpotInstanceType: one-time
   - !Ref AWS::NoValue
 ```
 
@@ -481,7 +477,8 @@ IAMロールをEC2インスタンスにアタッチするためのラッパー�
 #### Monitoring
 
 ```yaml
-Monitoring: true
+Monitoring:
+  Enabled: true
 ```
 
 詳細モニタリング有効（1分間隔のメトリクス収集）。
@@ -503,7 +500,7 @@ HttpPutResponseHopLimit: 1
 > [!IMPORTANT]
 > IMDSv2 必須化により、SSRF攻撃のリスクを軽減します。
 
-#### Tags (Instance)
+#### TagSpecifications (Instance)
 
 | キー | 値 |
 |------|-----|
@@ -517,7 +514,22 @@ HttpPutResponseHopLimit: 1
 
 ---
 
-### 5. AutoShutdownAlarm
+### 5. IsaacSimInstance
+
+**Type:** `AWS::EC2::Instance`
+
+LaunchTemplateを参照してEC2インスタンスを作成します。
+
+#### Properties
+
+| プロパティ | 値 |
+|-----------|-----|
+| `LaunchTemplate.LaunchTemplateId` | `!Ref IsaacSimLaunchTemplate` |
+| `LaunchTemplate.Version` | `!GetAtt IsaacSimLaunchTemplate.LatestVersionNumber` |
+
+---
+
+### 6. AutoShutdownAlarm
 
 **Type:** `AWS::CloudWatch::Alarm`  
 **Condition:** `AutoShutdownEnabled`（`AutoShutdownEnabled='true'` の場合のみ作成）

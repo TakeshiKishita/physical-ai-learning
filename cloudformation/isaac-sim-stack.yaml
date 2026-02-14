@@ -137,23 +137,29 @@ Resources:
           ToPort: 5910
           CidrIp: !Ref AllowedVNCCIDR
           Description: VNC access for remote desktop
-        # Omniverse WebRTC Streaming (HTTP/WebSocket)
+        # Isaac Sim WebRTC Streaming (HTTP/WebSocket)
+        - IpProtocol: tcp
+          FromPort: 8211
+          ToPort: 8211
+          CidrIp: !Ref AllowedVNCCIDR
+          Description: Isaac Sim WebRTC Streaming port
+        # Isaac Sim Omniverse services
         - IpProtocol: tcp
           FromPort: 8899
           ToPort: 8899
           CidrIp: !Ref AllowedVNCCIDR
-          Description: Omniverse Kit Remote (WebRTC) HTTP port
-        # Omniverse WebRTC Streaming (Media)
+          Description: Omniverse Kit Remote HTTP port (legacy)
+        # Isaac Sim WebRTC Media Streaming
         - IpProtocol: udp
           FromPort: 49000
           ToPort: 49100
           CidrIp: !Ref AllowedVNCCIDR
-          Description: Omniverse Kit Remote (WebRTC) Media ports
+          Description: Isaac Sim WebRTC Media ports (UDP)
         - IpProtocol: tcp
           FromPort: 49000
           ToPort: 49100
           CidrIp: !Ref AllowedVNCCIDR
-          Description: Omniverse Kit Remote (WebRTC) Media ports
+          Description: Isaac Sim WebRTC Media ports (TCP)
       # SecurityGroupEgress is automatically allowed
       Tags:
         - Key: Name

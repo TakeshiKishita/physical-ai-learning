@@ -11,24 +11,26 @@
 
 ## タスク一覧
 
-### Task 4-1：学習用タスク（例: Isaac Orbit）の起動
+### Task 4-1：学習用タスク（Isaac Lab）の起動
 
 **ゴール:** 学習前後でポリシーの挙動が変化するタスクを実際に動かす。
 
-1. 学習フレームワークのリポジトリをクローン（例）：
+> **Note**: Isaac Orbit は **Isaac Lab** に名称変更されました。以下は Isaac Lab を使用します。
+> GitHub: https://github.com/isaac-sim/IsaacLab
+
+1. Isaac Lab のリポジトリをクローンしてインストール：
 
    ```bash
    cd ~/work
-   git clone <orbit_repo_url> isaac-orbit
-   cd isaac-orbit
+   git clone https://github.com/isaac-sim/IsaacLab.git
+   cd IsaacLab
+   ./isaaclab.sh --install
    ```
 
-2. 必要な依存関係をインストール（リポジトリの README に従う）
-
-3. 学習スクリプトを実行（例）：
+2. 学習スクリプトを実行（例）：
 
    ```bash
-   python train_pick_and_place.py      --num-envs 64      --max-steps 100000
+   python scripts/rsl_rl/train.py --task Isaac-Lift-Franka-v0 --num_envs 64
    ```
 
 4. 学習前後の評価スクリプトを実行し、成功率などを `logs/week4_tasks.md` に記録：
@@ -96,7 +98,7 @@
    ```python
    # simple_policy.py の中で:
    # - 判定結果に応じてターゲットポーズを設定
-   # - Isaac Sim / Orbit のAPI経由でコマンド送信
+   # - Isaac Sim / Isaac Lab のAPI経由でコマンド送信
    ```
 
 4. 1サイクルの「見て→判定→動く」動作を確認し、フローをこのファイルに記録：

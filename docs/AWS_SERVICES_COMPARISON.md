@@ -204,14 +204,10 @@ aws ssm start-session --target i-0123456789abcdef0
 ### シェルスクリプト（シンプル）
 
 ```bash
-# セットアップ
-./scripts/setup_aws_env.sh
-
-# 起動
-./scripts/launch_instance.sh
-
-# 接続
-./scripts/connect_instance.sh
+# AWS CLIで直接操作する例
+aws ec2 run-instances --image-id ami-XXXXX --instance-type g4dn.2xlarge ...
+aws ec2 describe-instances --instance-ids i-XXXXX
+aws ec2 terminate-instances --instance-ids i-XXXXX
 ```
 
 ## 選択の指針
